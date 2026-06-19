@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Minecraft Study</title>
+
+    <script src="https://unpkg.com/jspsych@8.2.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe"></script>
+    <link href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css" rel="stylesheet" />
+    <script src="jspsych/consent.js"></script>
+    <script src="jspsych/feedback_demographics.js"></script>
+
+    <style>
+      body { font-family: Arial, sans-serif; text-align: center; }
+
+      .roulette-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 64px);
+        grid-gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
+      }
+
+      /* --- TILE: Minecraft stone block background + corner number --- */
+      .roulette-number {
+        width: 64px;
+        height: 64px;
+        position: relative;
+        cursor: pointer;
+        user-select: none;
+
+        border-radius: 10px;
+        border: 1px solid rgba(0,0,0,0.12);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+
+        background-image: url("img/stone.png");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .roulette-number:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+        border-color: rgba(0,0,0,0.18);
+      }
+
+      .roulette-number:active {
+        transform: translateY(0px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+      }
+
+      /* small number in the top-left corner */
+      .tile-num {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.02em;
+
+        color: rgba(255,255,255,0.95);
+        text-shadow:
+          0 1px 2px rgba(0,0,0,0.70),
+          0 0 6px rgba(0,0,0,0.35);
+
+        padding: 2px 5px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.35);
+        border: 1px solid rgba(255,255,255,0.12);
+      }
+
+      /* optional: subtle highlight for "hot" tiles */
+      .roulette-number.hot::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 10px;
+        box-shadow: inset 0 0 0 3px rgba(179,18,42,0.45);
+        pointer-events: none;
+      }
+
+      /* optional: show selection */
+      .roulette-number.selected::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 12px;
+        box-shadow: 0 0 0 3px rgba(17,17,17,0.22);
+        pointer-events: none;
+      }
+
+      /* Wins indicator (emerald + count) */
+      .wins-display {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 20px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .wins-display img {
+        width: 22px;
+        height: 22px;
+        image-rendering: pixelated;
+      }
+
+      .wins-display .wins-label {
+        color: rgba(0,0,0,0.78);
+        font-weight: 800;
+      }
+
+      .wins-display .wins-count {
+        min-width: 22px;
+        text-align: left;
+      }
+
+      /* ---- Instruction style ---- */
+      .instr-wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .instr-hero {
+        display: block;
+        width: min(360px, 55vw);
+        margin: 0 auto 16px;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+        border: 1px solid rgba(0,0,0,0.08);
+      }
+
+      .instr-title {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin: 6px 0 10px;
+        text-align: center;
+      }
+
+      .instr-text {
+        font-size: 16px;
+        line-height: 1.55;
+        color: rgba(0,0,0,0.82);
+        text-align: center;
+      }
+
+      .instr-text p {
+        margin: 10px auto;
+        max-width: 760px;
+      }
+
+      .instr-list {
+        display: inline-block;
+        text-align: left;
+        margin: 12px auto 0;
+        padding-left: 22px;
+        max-width: 760px;
+      }
+
+      .instr-list li {
+        margin: 8px 0;
+        padding-left: 4px;
+      }
+
+      .instr-list li::marker {
+        color: rgba(0,0,0,0.35);
+      }
+
+      .instr-note {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(0,0,0,0.08);
+        background: rgba(0,0,0,0.03);
+        color: rgba(0,0,0,0.75);
+        text-align: center;
+      }
+
+      /* ---- Hot numbers ---- */
+      #banner {
+        max-width: 820px;
+        margin: 10px auto 14px;
+        padding: 12px 14px;
+        text-align: left;
+        border-radius: 14px;
+
+        background: rgba(255,255,255,0.85);
+        border: 2px solid rgba(179,18,42,0.35);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+        backdrop-filter: blur(8px);
+
+        color: #111;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      #banner .banner-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #b3122a;
+        font-weight: 800;
+      }
+
+      #banner .banner-list {
+        margin-top: 6px;
+        color: rgba(0,0,0,0.72);
+        font-weight: 600;
+      }
+
+      /* ---- Regret questions ---- */
+      .regret-card {
+        max-width: 820px;
+        margin: 24px auto 0;
+        padding: 22px 22px 16px;
+        text-align: left;
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      }
+
+      .regret-title {
+        margin: 0 0 10px;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .regret-meta {
+        margin: 0 0 16px;
+        color: rgba(0,0,0,0.72);
+        line-height: 1.35;
+      }
+
+      .regret-item {
+        padding: 14px 14px 12px;
+        border-radius: 12px;
+        background: rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.06);
+        margin: 12px 0;
+      }
+
+      .regret-prompt {
+        margin: 0 0 10px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      .regret-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .regret-value-pill {
+        min-width: 54px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        background: rgba(0,0,0,0.07);
+        border: 1px solid rgba(0,0,0,0.10);
+      }
+
+      .regret-ends {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 13px;
+        color: rgba(0,0,0,0.65);
+      }
+
+      .regret-hint {
+        margin-top: 12px;
+        font-size: 13px;
+        color: rgba(0,0,0,0.62);
+      }
+
+      .regret-card, .regret-card * {
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      }
+
+      .regret-range {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(0,0,0,0.18), rgba(0,0,0,0.18));
+        outline: none;
+      }
+
+      .regret-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #111;
+        border: 2px solid #fff;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.20);
+        cursor: pointer;
+      }
+
+      .regret-range::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #111;
+        border: 2px solid #fff;
+        box-shadow: 0 6px 14px rgba(0,0,0,0.20);
+        cursor: pointer;
+      }
+
+      .regret-range::-moz-range-track {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.18);
+      }
+    </style>
+  </head>
+
+  <body></body>
+
+  <script>
+    /**********************************
+     Prolific and Datapipe integration
+    ***********************************/
+    const DATAPIPE_EXPERIMENT_ID = "z22US4du5wwq";
+    const PROLIFIC_COMPLETION_CODE = "C3W77LI9";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const PROLIFIC_PID = urlParams.get("PROLIFIC_PID") || "NA";
+    const STUDY_ID = urlParams.get("STUDY_ID") || "NA";
+    const SESSION_ID = urlParams.get("SESSION_ID") || "NA";
+
+    const PROLIFIC_COMPLETE_URL =
+      "https://app.prolific.com/submissions/complete?cc=" +
+      encodeURIComponent(PROLIFIC_COMPLETION_CODE);
+
+    const jsPsych = initJsPsych();
+
+    jsPsych.data.addProperties({
+      participant_id: PROLIFIC_PID,
+      prolific_pid: PROLIFIC_PID,
+      prolific_study_id: STUDY_ID,
+      prolific_session_id: SESSION_ID,
+      date_iso: new Date().toISOString()
+    });
+
+    /**********************************
+     Trial structure
+    ***********************************/
+    const TOTAL_TRIALS = 24;
+    const HOT_SET_SIZES = [1, 2, 3, 8, 16];
+    const NUMBERS = Array.from({ length: 36 }, (_, i) => i + 1);
+    const WIN_BLOCKS = 4;
+
+    const win_positions = [];
+    for (let b = 0; b < WIN_BLOCKS; b++) {
+      const posWithinBlock = jsPsych.randomization.sampleWithoutReplacement([2, 3, 4, 5], 1)[0];
+      win_positions.push(b * 6 + posWithinBlock);
+    }
+
+    let trials = Array.from({ length: TOTAL_TRIALS }, () => ({
+      banner: 0,
+      win_status: 0,
+      hot_set_size: 0,
+      outcome_rel_to_hot: "NA"
+    }));
+
+    win_positions.forEach((pos) => {
+      trials[pos] = { banner: 0, win_status: 1, hot_set_size: 0, outcome_rel_to_hot: "NA" };
+    });
+
+    let banner_templates = [];
+    HOT_SET_SIZES.forEach((size) => {
+      if (size === 1) {
+        banner_templates.push({ banner: 1, win_status: 0, hot_set_size: size, outcome_rel_to_hot: "nonhot_win_number" });
+        banner_templates.push({ banner: 1, win_status: 0, hot_set_size: size, outcome_rel_to_hot: "nonhot_win_number" });
+      } else {
+        banner_templates.push({ banner: 1, win_status: 0, hot_set_size: size, outcome_rel_to_hot: "hot_win_number" });
+        banner_templates.push({ banner: 1, win_status: 0, hot_set_size: size, outcome_rel_to_hot: "nonhot_win_number" });
+      }
+    });
+
+    let nonwin_indices = trials
+      .map((t, i) => (t.win_status === 0 ? i : null))
+      .filter((i) => i !== null);
+
+    let chosen_indices = jsPsych.randomization.sampleWithoutReplacement(nonwin_indices, banner_templates.length);
+    chosen_indices.forEach((idx, j) => (trials[idx] = banner_templates[j]));
+
+    let balance = 0.00;
+    let wins_so_far = 0;
+
+    /**********************************
+     GRID RENDERER (stone tiles + corner numbers)
+    ***********************************/
+    function makeRouletteGrid(hotNumbers) {
+      let html = `<div class='roulette-grid'>`;
+      NUMBERS.forEach((n) => {
+        const hotClass = (hotNumbers && hotNumbers.includes(n)) ? "hot" : "";
+        html += `
+          <div class='roulette-number ${hotClass}' data-num='${n}' aria-label='Number ${n}' role='button' tabindex='0'>
+            <span class='tile-num'>${n}</span>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      return html;
+    }
+
+    /**********************************
+     Start
+    ***********************************/
+    let timeline = [];
+
+    /**********************************
+     Instructions (unchanged)
+    ***********************************/
+    function instrPage(innerHtml, opts = {}) {
+      const title = opts.title ? `<div class="instr-title">${opts.title}</div>` : "";
+      return `
+        <div class="instr-wrap">
+          <img class="instr-hero" src="img/pickaxe.png" alt="Pickaxe">
+          ${title}
+          <div class="instr-text">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    var instructions_pages = [
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/pickaxe.png" alt="Pickaxe">
+        <div class="instr-title">Welcome to the Minecraft game!</div>
+        <div class="instr-text">
+          <p><b>We will now explain how the game works.</b> The instructions are spread across several pages. Please read each page carefully. You can use the buttons on the screen (or your keyboard) to navigate.</p>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/blocks.png" alt="Minecraft illustration">
+        <div class="instr-text">
+          <p>The game consists of <b>24 rounds</b></p>
+          <p>On each round:</p>
+          <ul class="instr-list">
+            <li>You will see 36 stone blocks labeled with numbers <b>1 to 36</b> in the corner</li>
+            <li>You can choose <b>one block to mine</b> by clicking on it</li>
+          </ul>
+          <div class="instr-note">There is exactly 1 block on any given round that contains an emerald!</div>
+        </div>
+      </div>
+      `,
+
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/loss_mc.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>If the block you mined does not contain an emerald, you get nothing for that round.</p>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/emerald.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>If the block you mined <b>contains an emerald</b>, then you receive <b>+1 emerald (= $0.25) in your wallet</b>.</p>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/emerald.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>Your goal is to mine as many emeralds as you can during the game.</p>
+          <div class="instr-note"><b>At the end of the game, all your emeralds will be converted to a bonus payment on Prolific!</b></div>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/reflection_mc.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>After seeing the outcome, you will be asked to reflect on your feelings about your most recent choice of a block to mine.</p>
+          <p>Use your mouse to record your answer and press “Continue” to proceed to the next round.</p>
+          <div class="instr-note"><b>Please report your feelings openly and honestly</b> regardless of how strong or weak they are! There are no right or wrong answers.</div>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/hot_blocks.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>Finally, on some rounds, you will see a banner above the block grid that says <b>HOT BLOCKS</b>.</p>
+          <p>Hot blocks are blocks that have been spawning emeralds frequently in the past. The number of hot blocks can vary.</p></p>
+          <div class="instr-note">Note that hot blocks are provided for your information only and you do NOT have to choose a hot block.</div>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/survey.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>After the game is finished, we will ask you a few general questions about yourself.</p>
+        </div>
+      </div>
+      `,
+      `
+      <div class="instr-wrap">
+        <img class="instr-hero" src="img/pickaxe.png" alt="Roulette illustration">
+        <div class="instr-text">
+          <p>You are now almost ready to begin the game! Please proceed to the next page for a quick comprehension check.</p>
+        </div>
+      </div>
+      `
+    ];
+
+    var instructions = {
+      type: jsPsychInstructions,
+      pages: instructions_pages,
+      show_clickable_nav: true,
+      button_label_previous: "Previous",
+      button_label_next: "Next"
+    };
+
+    const comprehension = {
+      type: jsPsychSurveyMultiChoice,
+      preamble: `
+        <h3>Comprehension Check</h3>
+        <p>To make sure everything is clear, please answer a few quick questions about the instructions you just read.</p>
+      `,
+      questions: [
+        {
+          prompt: "On each round, there are between 1 and 3 blocks that contain an emerald.",
+          options: ["True", "False"],
+          required: true
+        },
+        {
+          prompt: "On each round, you can mine exactly one block.",
+          options: ["True", "False"],
+          required: true
+        },
+        {
+          prompt: "If the block you choose hides a creeper, you lose all emeralds you have collected so far.",
+          options: ["True", "False"],
+          required: true
+        },
+        {
+          prompt: "Blocks labeled as HOT BLOCKS are shown to give you information, but you are not required to choose one of them.",
+          options: ["True", "False"],
+          required: true
+        },
+        {
+          prompt: "The number of emeralds you collect during the game will be converted into a bonus payment on Prolific, in addition to your base payment.",
+          options: ["True", "False"],
+          required: true
+        }
+      ],
+      on_finish: function(data) {
+        data.correct =
+          (data.response["Q0"] === "False" &&
+           data.response["Q1"] === "True"  &&
+           data.response["Q2"] === "False" &&
+           data.response["Q3"] === "True"  &&
+           data.response["Q4"] === "True");
+      }
+    };
+
+    const fail_comprehension = {
+      timeline: [{
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+          <h3>Oh no!</h3>
+          <p>You got one or more questions wrong.</p>
+          <p>Please go back, review the instructions, and try the comprehension check again!</p>
+        `,
+        choices: ["Review"]
+      }],
+      conditional_function: function() {
+        const last_comp = jsPsych.data.get()
+          .filter({ trial_type: "survey-multi-choice" })
+          .last(1).values()[0];
+        return !(last_comp && last_comp.correct === true);
+      }
+    };
+
+    const loop_node = {
+      timeline: [instructions, comprehension, fail_comprehension],
+      loop_function: function() {
+        const last_comp = jsPsych.data.get()
+          .filter({ trial_type: "survey-multi-choice" })
+          .last(1).values()[0];
+        return !(last_comp && last_comp.correct === true);
+      }
+    };
+
+    const ready_to_begin = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <h3>You are now ready to begin the game.</h3>
+        <img class="instr-hero" src="img/heart.png" alt="Minecraft illustration">
+        <p>Remember, your goal is to mine as many emeralds as you can.</p>
+        <p><b>Happy mining!</b></p>
+        <p>Press any key to start.</p>
+      `
+    };
+
+    timeline.push(consent);
+    timeline.push(loop_node);
+    timeline.push(ready_to_begin);
+
+    /**********************************
+     Main trial sequence
+    ***********************************/
+    trials.forEach((trial, idx) => {
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          let hotNumbers = [];
+          if (trial.banner === 1) {
+            hotNumbers = jsPsych.randomization.sampleWithoutReplacement(NUMBERS, trial.hot_set_size);
+          }
+          trial.hot_numbers = hotNumbers;
+
+          let bannerHTML = trial.banner
+            ? `
+              <div id="banner">
+                <div class="banner-title">HOT BLOCKS</div>
+                <div class="banner-list">${hotNumbers.join(", ")}</div>
+              </div>
+            `
+            : "";
+
+          return `
+            ${bannerHTML}
+            <h2>Round ${idx + 1} of ${TOTAL_TRIALS}</h2>
+            <p>Choose a block to mine!</p>
+            <div class="wins-display" aria-label="Wins so far">
+              <img src="img/emerald.png" alt="Emerald">
+              <span class="wins-label">Wins:</span>
+              <span class="wins-count">${wins_so_far}</span>
+            </div>
+            ${makeRouletteGrid(hotNumbers)}
+            <p><i>Pick a block to continue.</i></p>
+          `;
+        },
+        choices: "NO_KEYS",
+        on_load: function() {
+          // click handler
+          document.querySelectorAll(".roulette-number").forEach((el) => {
+            el.addEventListener("click", () => {
+              // optional: visual feedback for selected tile
+              document.querySelectorAll(".roulette-number").forEach(x => x.classList.remove("selected"));
+              el.classList.add("selected");
+
+              let choice = parseInt(el.dataset.num);
+
+              let outcome;
+              if (trial.win_status === 1) {
+                outcome = choice;
+              } else {
+                if (trial.banner === 1) {
+                  const H = trial.hot_numbers || [];
+
+                  if (trial.outcome_rel_to_hot === "hot_win_number") {
+                    const hotNotChoice = H.filter(n => n !== choice);
+                    if (hotNotChoice.length > 0) {
+                      outcome = jsPsych.randomization.sampleWithoutReplacement(hotNotChoice, 1)[0];
+                    } else {
+                      const notChoice = NUMBERS.filter(n => n !== choice);
+                      outcome = jsPsych.randomization.sampleWithoutReplacement(notChoice, 1)[0];
+                    }
+                  } else {
+                    const nonHot = NUMBERS.filter((n) => !H.includes(n) && n !== choice);
+                    if (nonHot.length > 0) {
+                      outcome = jsPsych.randomization.sampleWithoutReplacement(nonHot, 1)[0];
+                    } else {
+                      const notChoice = NUMBERS.filter(n => n !== choice);
+                      outcome = jsPsych.randomization.sampleWithoutReplacement(notChoice, 1)[0];
+                    }
+                  }
+                } else {
+                  outcome = jsPsych.randomization.sampleWithoutReplacement(
+                    NUMBERS.filter((n) => n !== choice),
+                    1
+                  )[0];
+                }
+              }
+
+              if (outcome === choice) {
+                balance += 0.35;
+                wins_so_far += 1;
+              } else {
+                balance -= 0.01;
+              }
+
+              jsPsych.finishTrial({
+                trial_index: idx,
+                choice,
+                outcome,
+                balance,
+                banner: trial.banner,
+                win_status: trial.win_status,
+                hot_set_size: trial.hot_set_size,
+                hot_numbers: trial.hot_numbers,
+                outcome_rel_to_hot: trial.outcome_rel_to_hot
+              });
+            });
+          });
+
+          // optional: allow keyboard selection via Enter/Space (accessibility)
+          document.querySelectorAll(".roulette-number").forEach((el) => {
+            el.addEventListener("keydown", (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                el.click();
+              }
+            });
+          });
+        }
+      });
+
+      // feedback screen 
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          const last = jsPsych.data.get()
+            .filterCustom(d => d.choice !== undefined && d.outcome !== undefined)
+            .last(1).values()[0];
+          const win = last.choice === last.outcome;
+
+          const imgSrc = win ? "img/emerald.png" : "img/creeper.png";
+          const headingText = win ? "You got emerald!" : "You got nothing.";
+          const headingColor = win ? "#1a7f37" : "#b3122a";
+
+          return `
+            <div style="max-width:720px; margin:0 auto;">
+              <img
+                src="${imgSrc}"
+                alt="${win ? "Win" : "Loss"}"
+                style="
+                  display:block;
+                  margin: 0 auto 14px;
+                  width: min(280px, 60vw);
+                  border-radius: 14px;
+                  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+                "
+              />
+
+              <h2 style="color:${headingColor}; margin-bottom:6px;">
+                ${headingText}
+              </h2>
+
+              <p>Block that had an emerald: <b>${last.outcome}</b></p>
+              <p>Block that you chose: <b>${last.choice}</b></p>
+
+              <div class="wins-display" aria-label="Wins so far">
+                <img src="img/emerald.png" alt="Emerald">
+                <span class="wins-label">Wins:</span>
+                <span class="wins-count">${wins_so_far}</span>
+              </div>
+
+              <p style="margin-top:14px;">Press any key to continue.</p>
+            </div>
+          `;
+        }
+      });
+
+      // regret questions
+      timeline.push({
+        type: jsPsychSurveyHtmlForm,
+        html: function() {
+          const all = jsPsych.data.get().values();
+          const last = [...all].reverse().find(t => t.choice !== undefined && t.outcome !== undefined);
+
+          const choice = last.choice;
+          const outcome = last.outcome;
+          const banner = last.banner;
+          const hot_numbers = last.hot_numbers || [];
+
+          const lost = choice !== outcome;
+
+          let probe = null;
+          if (banner === 1 && hot_numbers.length > 0) {
+            const nonChosenHot = hot_numbers.filter(n => n !== choice && n !== outcome);
+            if (nonChosenHot.length > 0) {
+              probe = jsPsych.randomization.sampleWithoutReplacement(nonChosenHot, 1)[0];
+            }
+          }
+
+          const sliderBlock = (name, prompt) => `
+            <div class="regret-item">
+              <div class="regret-prompt">${prompt}</div>
+              <div class="regret-row">
+                <input
+                  class="regret-range"
+                  type="range"
+                  name="${name}"
+                  id="${name}"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="0"
+                  data-moved="0"
+                />
+                <div class="regret-value-pill"><span id="${name}_val">0</span></div>
+              </div>
+              <div class="regret-ends">
+                <span>Not at all</span>
+                <span>Extremely</span>
+              </div>
+            </div>
+          `;
+
+          return `
+            <div class="regret-card">
+              <div class="regret-title">Reflection</div>
+              <div class="regret-meta">
+                <div>You chose block <b>${choice}</b>.</div>
+                <div>The winning block was <b>${outcome}</b>.</div>
+              </div>
+
+              ${sliderBlock("regret_chosen", `How much do you regret choosing <b>${choice}</b>?`)}
+
+              ${lost ? sliderBlock("regret_not_winner", `How much do you regret <b>NOT</b> choosing <b>${outcome}</b>?`) : ""}
+
+              <div class="regret-hint">Move each slider at least once to continue.</div>
+            </div>
+          `;
+        },
+        button_label: "Continue",
+
+        on_load: function() {
+          const btn = document.querySelector(".jspsych-btn");
+          const sliders = Array.from(document.querySelectorAll('input[type="range"]'));
+
+          const updateBtn = () => {
+            const allMoved = sliders.every(s => s.dataset.moved === "1");
+            btn.disabled = !allMoved;
+          };
+
+          btn.disabled = true;
+
+          sliders.forEach(s => {
+            const valSpan = document.getElementById(`${s.id}_val`);
+            const handler = () => {
+              s.dataset.moved = "1";
+              if (valSpan) valSpan.textContent = s.value;
+              updateBtn();
+            };
+            s.addEventListener("input", handler);
+            s.addEventListener("change", handler);
+          });
+
+          updateBtn();
+        },
+
+        on_finish: function(data) {
+          for (const k in data.response) data.response[k] = Number(data.response[k]);
+
+          const last_choice = jsPsych.data.get()
+            .filterCustom(d => d.choice !== undefined && d.outcome !== undefined)
+            .last(1).values()[0];
+
+          data.choice = last_choice.choice;
+          data.outcome = last_choice.outcome;
+          data.banner = last_choice.banner;
+          data.hot_numbers = last_choice.hot_numbers;
+          data.outcome_rel_to_hot = last_choice.outcome_rel_to_hot;
+        }
+      });
+    });
+
+    // demographics
+    timeline.push(feedback_demographics);
+
+    /**********************************
+     Record data and redirect to Prolific
+    ***********************************/
+    timeline.push({
+      type: jsPsychPipe,
+      action: "save",
+      experiment_id: DATAPIPE_EXPERIMENT_ID,
+      filename: function() {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        return `roulette_pid-${PROLIFIC_PID}_sess-${SESSION_ID}_${ts}.csv`;
+      },
+      data_string: function() {
+        return jsPsych.data.get().csv();
+      }
+    });
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <h2>All done!</h2>
+        <img class="instr-hero" src="img/heart.png" alt="Minecraft illustration">
+        <p>Press any key to return to Prolific and complete your submission.</p>
+      `,
+      on_finish: function() {
+        window.location.href = PROLIFIC_COMPLETE_URL;
+      }
+    });
+
+    jsPsych.run(timeline);
+  </script>
+</html>
