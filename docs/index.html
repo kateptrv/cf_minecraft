@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Minecraft Counterfactual Study</title>
+    <title>Minecraft Study</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
@@ -665,8 +665,8 @@
        - Make sure your DataPipe experiment has "Data collection" enabled, and
          (during piloting) is in OSF or "Open" mode so saves go through.
     ***********************************/
-    const DATAPIPE_EXPERIMENT_ID = "REPLACE_ME";          // e.g. "abc123XYZ"
-    const PROLIFIC_COMPLETION_CODE = "REPLACE_ME";        // e.g. "C1ABC123"
+    const DATAPIPE_EXPERIMENT_ID = "Ci8MtvcEm02R";          
+    const PROLIFIC_COMPLETION_CODE = "CF6UBDAN";       
 
     const urlParams = new URLSearchParams(window.location.search);
     const PROLIFIC_PID = urlParams.get("PROLIFIC_PID") || "NA";
@@ -682,7 +682,7 @@
 
     const PROLIFIC_COMPLETE_URL =
       "https://app.prolific.com/submissions/complete?cc=" +
-      encodeURIComponent(PROLIFIC_COMPLETION_CODE);
+      encodeURIComponent("CF6UBDAN");
 
     if (DATAPIPE_EXPERIMENT_ID === "REPLACE_ME") {
       console.warn(
@@ -1845,7 +1845,7 @@
           <p>You're going to play a short Minecraft-style mining game.</p>
           <p>Your job is simple: at each mining site, decide which single block to mine and try to get the most valuable resources.</p>
           <p>You will be <b>teleported from one mining site to another</b>, visiting <b>66 sites total</b> over the course of the game. Each site will have 16 blocks arranged in a 4x4 grid for you to choose from.</p>
-          <div class="instr-note">Each 10 points you collect will earn you an entry into a raffle, increasing your chances of winning a Minecraft-themed prize! But more about that later...</div>
+          <div class="instr-note">Each point you earn is worth 1 cent on top of the base payment of $6.00!</div>
         </div>
       </div>
       `,
@@ -1854,7 +1854,7 @@
         <img class="instr-hero" src="img/diamond.png" alt="Diamond">
         <div class="instr-title">What's in a block?</div>
         <div class="instr-text">
-          <p>When you mine a block, you might find one of these:</p>
+          <p>When you mine a block, you might find nothing at all OR one of these 4 ores:</p>
           <ul class="instr-list">
             <li><img src="img/coal.png" style="width:22px;vertical-align:middle;image-rendering:pixelated;"> <b>Coal</b> &nbsp;→&nbsp; +1 XP</li>
             <li><img src="img/copper.png" style="width:22px;vertical-align:middle;image-rendering:pixelated;"> <b>Copper</b> &nbsp;→&nbsp; +2 XP</li>
@@ -1876,7 +1876,7 @@
             <li><b>Cave</b> — more mixed, with more valuable resources appearing more often.</li>
             <li><b>Deep Cave</b> — richest overall, with high-value resources appearing most often.</li>
           </ul>
-          <div class="instr-note">Each mining site is independent. What was hidden in one site tells you nothing about what is hidden in the next site.</div>
+          <div class="instr-note">Each mining site is independent. What was hidden in one site tells you nothing about what is hidden in the next site. Sometimes, you may be transported from one site to another site in the same biome. The background images will look the same, but remember that each site is unique.</div>
         </div>
       </div>
       `,
@@ -1905,7 +1905,7 @@
         <img class="instr-hero" src="img/consider.png" alt="Consider">
         <div class="instr-title">Considered blocks</div>
         <div class="instr-text">
-          <p>On other sites, you will first be asked to <b>consider</b> either 2 or 8 blocks you want to mine before making your final choice. This means narrowing down the set of blocks you are seriously considering before choosing which one to mine. At first, your choices to consider may seem random. Over time, you will learn to consider blocks that you suspect might have the most valuable resources.</p>
+          <p>On other sites, you will first be asked to carefully <b>consider</b> either 2 or 8 blocks you want to mine before making your final choice. This means narrowing down the set of blocks you are seriously considering before choosing which one to mine. At first, your choices of which blocks to consider may seem random. Over time, you will learn to consider blocks that you suspect might have the most valuable resources.</p>
           <p>On some sites, you will see not only what your chosen block contained, but also what the other blocks you considered contained, providing you with more information about which locations might be more valuable than others.</p>
         </div>
       </div>

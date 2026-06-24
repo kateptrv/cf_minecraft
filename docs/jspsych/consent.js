@@ -1,5 +1,5 @@
 // TODO: FILL OUT APPROX. EXPERIMENT LENGTH
-var time = '5-10 minutes';
+var time = 'approximately 30 minutes';
 
 const consent = {
     type: jsPsychHtmlButtonResponse,
