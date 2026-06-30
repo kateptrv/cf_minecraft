@@ -1,0 +1,140 @@
+---
+title: "Processing"
+author: "KP"
+date: "2026-6-25"
+output: html_document
+---
+
+```{r}
+if(!suppressWarnings(require(pacman))){install.packages("pacman");library("pacman")}
+p_load(tidyverse, tidyr, dplyr, ggplot2, stats, sjPlot, readr, ggpubr, patchwork, lubridate, ggthemr, ggdist, ggpubr, showtext, usethis, data.table, png, grid, purrr, ggimage, osfr, jsonlite)
+```
+
+```{r}
+data_raw <- read_csv("../data/data_raw.csv")
+```
+# Helpers
+
+```{r}
+# Anonymization: deterministic Prolific ID -> P0001, P0002, ... map.
+# Applied to the prolific_pid column of every clean CSV before it is written
+# to disk so that no raw Prolific IDs end up in the version-controlled data.
+# data_raw and data_raw.csv stay local (see .gitignore).
+anon_map <- data_raw |>
+  distinct(prolific_pid) |>
+  arrange(prolific_pid) |>
+  mutate(anon_id = sprintf("P%04d", row_number())) |>
+  tibble::deframe()
+
+anonymize_pid <- function(df) {
+  df |> mutate(prolific_pid = unname(anon_map[prolific_pid]))
+}
+```
+
+```{r}
+# how many attempts did it take them to do the comprehension check right
+comp_attempts <- data_raw |>
+  filter(trial_type == "survey-multi-choice") |>
+  group_by(prolific_pid) |>
+  summarise(
+    comp_attempts = n(),
+    comp_passed = any(correct %in% TRUE),
+    # "tries it took to get it right" = index of first TRUE
+    comp_tries_to_pass = {
+      idx <- which(correct %in% TRUE)
+      if (length(idx) == 0) NA_integer_ else min(idx)
+    },
+    .groups = "drop"
+  )
+```
+
+```{r}
+# extracting demographic data
+safe_fromJSON <- function(x) {
+  tryCatch(fromJSON(x), error = function(e) NULL)
+}
+
+demographics <- data_raw |>
+  filter(trial_type == "survey-html-form") |>
+  transmute(
+    prolific_pid,
+    resp = map(response, safe_fromJSON)
+  ) |>
+  filter(map_lgl(resp, ~ !is.null(.x) && (("age" %in% names(.x)) || ("minecraft_freq_1mo" %in% names(.x)) || ("performance_satisfaction" %in% names(.x))))) |>
+  group_by(prolific_pid) |>
+  slice_tail(n = 1) |>  
+  ungroup() |>
+  transmute(
+    prolific_pid,
+    comments         = map_chr(resp, ~ .x$comments %||% NA_character_),
+    age              = map_int(resp, ~ as.integer(.x$age %||% NA_integer_)),
+    minecraft_freq_1mo  = map_chr(resp, ~ .x$minecraft_freq_1mo %||% NA_character_),
+    performance_satisfaction      = map_int(resp, ~ .x$performance_satisfaction %||% NA_integer_) |> as.integer(),
+    race             = map_chr(resp, ~ .x$race %||% NA_character_),
+    gender           = map_chr(resp, ~ .x$gender %||% NA_character_))
+```
+
+# Processing
+
+```{r}
+data_processed <- data_raw |>
+  filter(phase %in% c("choice", "outcome", "counterfactual_feedback", "regret_probes")) |>
+  select(prolific_pid, response, phase:revealed_blocks) |>
+  group_by(prolific_pid) |>
+  # shifting up so that the "choice" phase row has all the info
+  mutate(
+    response = lead(response, 3),
+    outcome_kind = lead(outcome_kind, 3),
+    outcome_payout = lead(outcome_payout, 3),
+    focal_cf_block = lead(focal_cf_block, 3),
+    focal_cf_kind = lead(focal_cf_kind, 3),
+    focal_cf_payout = lead(focal_cf_payout, 3),
+    cf_max_diff = lead(cf_max_diff, 3),
+    cf_best_alt_value = lead(cf_best_alt_value, 3),
+    creeper_severity = lead(creeper_severity, 3),
+    best_alt_block = lead(best_alt_block, 3),
+    best_alt_kind = lead(best_alt_kind, 3),
+    best_alt_payout = lead(best_alt_payout, 3),
+    best_alt_adjacent = lead(best_alt_adjacent, 3),
+    n_adjacent_highvalue = lead(n_adjacent_highvalue, 3),
+    wallet_after = lead(wallet_after, 3),
+    revealed_blocks = lead(revealed_blocks, 3)
+  ) |>
+  ungroup() |>
+  # can now just keep the "choice" rows, resulting in 66 rows per participant
+  filter(phase == "choice") |>
+  select(-phase) |>
+  # removing more redundant and old variables
+  select(-c(forced_creeper_trial, n_adjacent_highvalue,
+            salience_mode, highlight_pattern, salience_set,
+            consider_target_n, focal_cf_block:creeper_severity,
+            revealed_blocks, consider_toggles, salience)) |>
+  # extracting numeric value from "response" and renaming it regret
+  mutate(regret = parse_number(na_if(response, "null"))) |>
+  select(-response) |>
+  filter(!is.na(outcome_kind)) |>
+  filter(!is.na(regret)) |>
+  group_by(prolific_pid) |>
+  mutate(trial_index = row_number()) |>
+  ungroup() |>
+  rename(outcome_value = outcome_payout,
+         best_alt_value = best_alt_payout,
+         xp = wallet_after) |>
+  # merge with demographics and comprehension attempts
+  left_join(comp_attempts, by = "prolific_pid") |>
+  select(-c(comp_attempts, comp_passed)) |>
+  left_join(demographics, by = "prolific_pid") |>
+  filter(prolific_pid != "616df84c6b74228061808ca6") # that's me piloting
+
+# save anonymized
+write_csv(anonymize_pid(data_processed), "../data/data_processed.csv")
+
+```
+
+# Session Info
+
+```{r}
+# session info
+sessionInfo() |>
+  capture.output("processing_session_info.txt")
+```

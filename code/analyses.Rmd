@@ -1,0 +1,28 @@
+---
+title: "analyses"
+author: "Kate Petrova + Nate Yanowitch"
+date: "2025-08-07"
+output: html_document
+---
+
+# Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = TRUE)
+
+if(!suppressWarnings(require(pacman))){install.packages("pacman");library("pacman")}
+p_load(tidyverse, tidyr, dplyr, ggplot2, stats, sjPlot, readr, ggpubr, patchwork, lubridate, devtools, ggdist, ggpubr, showtext, usethis, data.table, png, grid, purrr, ggimage)
+
+devtools::install_github('Mikata-Project/ggthemr')
+library(ggthemr)
+```
+
+```{r}
+ggthemr("fresh", type = "outer", line_weight = 0.5, text_size = 14)
+
+showtext_auto()
+```
+
+```{r}
+data <- read_csv("../data/data_processed.csv")
+```

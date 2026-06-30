@@ -1,0 +1,64 @@
+---
+output:
+  reprex::reprex_document:
+    venue: "gh"
+    advertise: FALSE
+    session_info: TRUE
+    style: TRUE
+    comment: "#;-)"
+    tidyverse_quiet: FALSE
+    std_out_err: TRUE
+knit: reprex::reprex_render
+---
+
+```{r}
+if(!suppressWarnings(require(pacman))){install.packages("pacman");library("pacman")}
+p_load(tidyverse, tidyr, dplyr, osfr, jsonlite)
+```
+
+
+```{r}
+Sys.getenv("HOME")
+normalizePath("~")
+```
+
+```{r}
+osf_auth(Sys.getenv("OSF_PAT")) # authenticating with OSF using a personal access token in the .Renviron in the home directory
+mc_osf <- osf_retrieve_node("Jt9zd")
+mc_osf <- osf_refresh(mc_osf)
+```
+
+```{r}
+data_files <- osf_ls_files(mc_osf)
+data_files
+```
+
+```{r}
+getwd()
+list.files(".", all.files = TRUE)
+normalizePath("data", mustWork = FALSE)
+dir.exists("data")
+list.files("data", all.files = TRUE)
+```
+
+
+```{r}
+#download all files in the osf project into ../data
+osf_retrieve_node("https://osf.io/Jt9zd/") |>
+  osf_ls_files(n_max = Inf) |>
+  osf_download(conflicts = "skip", path = "../data/")
+```
+
+```{r}
+# delete files containing "sess-NA" in their filename
+file.remove(list.files(path = "data/", pattern = "sess-NA", full.names = TRUE))
+```
+
+```{r}
+# concatenate files with sess != NA
+data_raw <- list.files(path = "../data/", pattern = "cf_minecraft_pid", full.names = TRUE) |>
+  lapply(read_csv) |>
+  bind_rows()
+
+write_csv(data_raw, "../data/data_raw.csv")
+```

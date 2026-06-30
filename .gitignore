@@ -1,0 +1,18 @@
+# Local environments
+.venv/
+env/
+renv/
+
+# RStudio / R session files
+.Rhistory
+.RData
+.Ruserdata
+.Rapp.history
+.Rproj.user/
+.Renviron
+*.Rproj
+
+# Generated R artifacts for this project
+/code/processing.rmd
+/data/data_raw.csv
+cf_minecraft_pid-*
