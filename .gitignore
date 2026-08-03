@@ -3,6 +3,10 @@
 env/
 renv/
 
+# Python
+__pycache__/
+*.pyc
+
 # RStudio / R session files
 .Rhistory
 .RData
@@ -16,3 +20,13 @@ renv/
 /code/processing.rmd
 /data/data_raw.csv
 cf_minecraft_pid-*
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Raw physio recordings (participant videos + Mindware source) — never
+# commit; too large and privacy-sensitive. The processed CSVs under
+# data/physio_processed/ are fine.
+/data/physio/
+

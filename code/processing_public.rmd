@@ -120,6 +120,11 @@ data_processed <- data_raw |>
   rename(outcome_value = outcome_payout,
          best_alt_value = best_alt_payout,
          xp = wallet_after) |>
+  mutate(comparison_type = case_when(outcome_value > best_alt_value ~ "good_to_bad",
+                                     outcome_value < best_alt_value ~ "bad_to_good",
+                                     outcome_value == best_alt_value ~ "equal")) |>
+  mutate(comparison_type = ifelse(salience_count == 0, "null", comparison_type),
+         feedback = ifelse(salience_count == 0, "partial", feedback)) |>
   # merge with demographics and comprehension attempts
   left_join(comp_attempts, by = "prolific_pid") |>
   select(-c(comp_attempts, comp_passed)) |>

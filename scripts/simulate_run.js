@@ -39,8 +39,13 @@ function choice(arr) { return arr[Math.floor(rand() * arr.length)]; }
 function jitterMs(min, max) { return Math.floor(min + rand() * (max - min)); }
 
 /* -------- Task constants (mirror experiment file) -------- */
-const GRID_COLS = 4, GRID_ROWS = 4, GRID_N = 16;
+const GRID_COLS = 3, GRID_ROWS = 3, GRID_N = GRID_COLS * GRID_ROWS;
 const NUMBERS = Array.from({ length: GRID_N }, (_, i) => i + 1);
+const BIOME_Y_COORDS = {
+  overworld: [90, 75, 60],
+  cave:      [50, 35, 20],
+  deep:      [10, -5, -20]
+};
 
 const ORES = {
   coal: { value: 1 }, copper: { value: 2 }, iron: { value: 3 }, diamond: { value: 4 }
@@ -54,28 +59,25 @@ const BIOMES = {
 
 const ROW_OUTCOME_DISTS = {
   overworld: [
-    { none: 0.60, coal: 0.28, copper: 0.08, iron: 0.03, diamond: 0.01 },
-    { none: 0.52, coal: 0.26, copper: 0.12, iron: 0.07, diamond: 0.03 },
-    { none: 0.44, coal: 0.22, copper: 0.14, iron: 0.12, diamond: 0.08 },
-    { none: 0.34, coal: 0.16, copper: 0.16, iron: 0.16, diamond: 0.18 }
+    { none: 0.60,  coal: 0.28,  copper: 0.08,  iron: 0.03,   diamond: 0.01  },
+    { none: 0.48,  coal: 0.24,  copper: 0.13,  iron: 0.095,  diamond: 0.055 },
+    { none: 0.34,  coal: 0.16,  copper: 0.16,  iron: 0.16,   diamond: 0.18  }
   ],
   cave: [
-    { none: 0.52, coal: 0.20, copper: 0.14, iron: 0.09, diamond: 0.05 },
-    { none: 0.44, coal: 0.16, copper: 0.16, iron: 0.14, diamond: 0.10 },
-    { none: 0.36, coal: 0.12, copper: 0.16, iron: 0.18, diamond: 0.18 },
-    { none: 0.28, coal: 0.08, copper: 0.14, iron: 0.22, diamond: 0.28 }
+    { none: 0.52,  coal: 0.20,  copper: 0.14,  iron: 0.09,   diamond: 0.05  },
+    { none: 0.40,  coal: 0.14,  copper: 0.16,  iron: 0.16,   diamond: 0.14  },
+    { none: 0.28,  coal: 0.08,  copper: 0.14,  iron: 0.22,   diamond: 0.28  }
   ],
   deep: [
-    { none: 0.42, coal: 0.10, copper: 0.16, iron: 0.18, diamond: 0.14 },
-    { none: 0.36, coal: 0.08, copper: 0.14, iron: 0.20, diamond: 0.22 },
-    { none: 0.30, coal: 0.06, copper: 0.12, iron: 0.20, diamond: 0.32 },
-    { none: 0.24, coal: 0.04, copper: 0.10, iron: 0.20, diamond: 0.42 }
+    { none: 0.42,  coal: 0.10,  copper: 0.16,  iron: 0.18,   diamond: 0.14  },
+    { none: 0.33,  coal: 0.07,  copper: 0.13,  iron: 0.20,   diamond: 0.27  },
+    { none: 0.24,  coal: 0.04,  copper: 0.10,  iron: 0.20,   diamond: 0.42  }
   ]
 };
 const CREEPER_RATE = 0;  // creepers disabled in the live task
 
 const FEEDBACK_TYPES = ["full", "partial"];
-const SALIENCE_COUNTS = { none: 0, little: 2, a_lot: 8 };
+const SALIENCE_COUNTS = { none: 0, little: 2, a_lot: 6 };
 const COMPARISON_TYPES = ["good_to_bad", "bad_to_good"];
 const TARGET_TOTAL_TRIALS = 66;
 
@@ -195,7 +197,7 @@ function buildTrialList() {
     .map((c, i) => (c.feedback === "full" && c.salience !== "none") ? i : -1)
     .filter((i) => i >= 0);
   const shuffledDirectional = shuffle(directionalIdxs);
-  const NUM_GOOD_TO_BAD = Math.min(12, shuffledDirectional.length);
+  const NUM_GOOD_TO_BAD = Math.min(10, shuffledDirectional.length);
   shuffledDirectional.forEach((idx, j) => {
     cells[idx].comparison_type = j < NUM_GOOD_TO_BAD ? "good_to_bad" : "bad_to_good";
   });
@@ -233,8 +235,15 @@ const COLUMNS = [
   "outcome_kind", "outcome_payout", "creeper_severity",
   "focal_cf_block", "focal_cf_kind", "focal_cf_payout", "cf_max_diff", "cf_best_alt_value",
   "best_alt_block", "best_alt_kind", "best_alt_payout", "best_alt_adjacent", "n_adjacent_highvalue",
-  "revealed_blocks", "regret_revealed_blocks", "wallet_after",
+  "revealed_blocks", "revealed_kinds", "revealed_payouts", "revealed_map",
+  "regret_revealed_blocks", "wallet_after",
   "response",
+  // physio-alignment timestamps + event markers
+  "epoch_start_ms", "epoch_end_ms", "perf_start_ms", "perf_end_ms",
+  "event_marker_on", "event_marker_off",
+  "block_selected_epoch_ms", "block_selected_perf_ms", "event_marker_block_selected",
+  "session_start_epoch_ms", "session_start_perf_ms", "session_start_iso",
+  // metadata
   "participant_id", "prolific_pid", "prolific_study_id", "prolific_session_id", "date_iso",
   "tally_by_biome", "tally_by_feedback", "tally_by_salience", "tally_by_salience_mode",
   "tally_by_comparison_type", "tally_total"
@@ -255,13 +264,32 @@ let timeMs = 0;
 let trialIdxJs = 0;
 let walletXP = 0;
 
+const SESSION_START_EPOCH_MS = Date.now();
+const SESSION_START_PERF_MS  = 0;
 const PARTICIPANT = {
   participant_id: "SIM-001",
   prolific_pid: "SIM-001",
   prolific_study_id: "SIM-STUDY",
   prolific_session_id: `SIM-SESS-${SEED}`,
-  date_iso: new Date().toISOString()
+  date_iso: new Date().toISOString(),
+  session_start_epoch_ms: SESSION_START_EPOCH_MS,
+  session_start_perf_ms:  SESSION_START_PERF_MS,
+  session_start_iso:      new Date(SESSION_START_EPOCH_MS).toISOString()
 };
+
+// Simulated wall-clock time advances by `timeMs` since session start.
+function stampPhase(phaseDurationMs, markerOn, markerOff) {
+  const start = SESSION_START_EPOCH_MS + timeMs;
+  const end   = start + phaseDurationMs;
+  return {
+    epoch_start_ms:  start,
+    epoch_end_ms:    end,
+    perf_start_ms:   timeMs,
+    perf_end_ms:     timeMs + phaseDurationMs,
+    event_marker_on:  markerOn,
+    event_marker_off: markerOff
+  };
+}
 
 const trialList = buildTrialList();
 
@@ -294,8 +322,10 @@ for (let idx = 0; idx < trialList.length; idx++) {
   const salienceCount = SALIENCE_COUNTS[cell.salience] || 0;
 
   // 1) Biome cue
+  const stampBiome = stampPhase(BIOME_CUE_MS, "biome_cue_on", "biome_cue_off");
   timeMs += BIOME_CUE_MS;
   pushRow({
+    ...stampBiome,
     trial_type: "html-keyboard-response", rt: null,
     phase: "biome_cue", trial_index: idx,
     biome: cell.biome, feedback: cell.feedback, salience: cell.salience,
@@ -305,8 +335,10 @@ for (let idx = 0; idx < trialList.length; idx++) {
 
   // 2) Pre-ITI
   const preItiMs = jitterMs(PRE_ITI_MIN_MS, PRE_ITI_MAX_MS);
+  const stampPreIti = stampPhase(preItiMs, "pre_iti_on", "pre_iti_off");
   timeMs += preItiMs;
   pushRow({
+    ...stampPreIti,
     trial_type: "html-keyboard-response", rt: null,
     phase: "pre_iti", trial_index: idx
   });
@@ -322,14 +354,21 @@ for (let idx = 0; idx < trialList.length; idx++) {
   }
   const choiceBlock = pickChoice(considerSet);
   const choiceRt = Math.round(800 + rand() * 2200 + (salienceCount > 0 ? 1500 + rand() * 2000 : 0));
+  const stampChoice = stampPhase(choiceRt, "choice_on", "choice_off");
+  const blockSelectedEpochMs = stampChoice.epoch_end_ms;   // click commit = end of choice
+  const blockSelectedPerfMs  = stampChoice.perf_end_ms;
   timeMs += choiceRt;
   pushRow({
+    ...stampChoice,
     trial_type: "html-keyboard-response", rt: choiceRt,
     phase: "choice", trial_index: idx,
     biome: cell.biome, feedback: cell.feedback,
     salience: cell.salience, salience_mode: cell.salience_mode, salience_count: salienceCount,
     comparison_type: cell.comparison_type, forced_creeper_trial: false,
     choice: choiceBlock, choice_rt: choiceRt,
+    block_selected_epoch_ms: blockSelectedEpochMs,
+    block_selected_perf_ms:  blockSelectedPerfMs,
+    event_marker_block_selected: "block_selected",
     salience_set: [], highlight_pattern: null,
     consider_set: considerSet, consider_target_n: considerTargetN, consider_toggles: considerToggles
   });
@@ -358,8 +397,10 @@ for (let idx = 0; idx < trialList.length; idx++) {
   const bestAltAdjacent = areAdjacent(choiceBlock, bestAltBlock);
   const chosenVal = outcomePayout;
   const nAdjHigh = neighborsOf(choiceBlock).filter((n) => payoutForContent(board[n]) > chosenVal).length;
+  const stampAnticip = stampPhase(ANTICIPATION_MS, "anticipation_on", "anticipation_off");
   timeMs += ANTICIPATION_MS;
   pushRow({
+    ...stampAnticip,
     trial_type: "html-keyboard-response", rt: null,
     phase: "anticipation", trial_index: idx
   });
@@ -367,8 +408,10 @@ for (let idx = 0; idx < trialList.length; idx++) {
   // 5) Outcome reveal
   walletXP += outcomePayout;
   const outcomeViewRt = Math.round(1500 + rand() * 1500);
+  const stampOutcome = stampPhase(outcomeViewRt, "outcome_on", "outcome_off");
   timeMs += outcomeViewRt;
   pushRow({
+    ...stampOutcome,
     trial_type: "html-keyboard-response", rt: outcomeViewRt,
     phase: "outcome", trial_index: idx,
     biome: cell.biome, feedback: cell.feedback,
@@ -386,14 +429,25 @@ for (let idx = 0; idx < trialList.length; idx++) {
 
   // 6) Counterfactual feedback
   const revealedBlocks = cell.feedback === "full" ? considerRevealedPool : [];
+  const revealedKinds = revealedBlocks.map((n) => board[n] ? board[n].kind : null);
+  const revealedPayouts = revealedBlocks.map((n) => payoutForContent(board[n]));
+  const revealedMap = {};
+  revealedBlocks.forEach((n) => {
+    revealedMap[n] = { kind: board[n] ? board[n].kind : null, payout: payoutForContent(board[n]) };
+  });
+  const stampCf = stampPhase(COUNTERFACTUAL_MS, "cf_on", "cf_off");
   timeMs += COUNTERFACTUAL_MS;
   pushRow({
+    ...stampCf,
     trial_type: "html-keyboard-response", rt: null,
     phase: "counterfactual_feedback", trial_index: idx,
     biome: cell.biome, feedback: cell.feedback,
     salience: cell.salience, salience_mode: cell.salience_mode, salience_count: salienceCount,
     comparison_type: cfLabel || cell.comparison_type, forced_creeper_trial: false,
     revealed_blocks: revealedBlocks,
+    revealed_kinds: revealedKinds,
+    revealed_payouts: revealedPayouts,
+    revealed_map: revealedMap,
     focal_cf_block: m.focalCfBlock, focal_cf_kind: m.focalCfContent ? m.focalCfContent.kind : null,
     focal_cf_payout: m.focalCfPayout, cf_max_diff: m.cfMaxDiff, cf_best_alt_value: m.cfBestAltValue,
     best_alt_block: bestAltBlock, best_alt_kind: bestAltContent.kind, best_alt_payout: bestAltPayout,
@@ -404,8 +458,10 @@ for (let idx = 0; idx < trialList.length; idx++) {
   // 7) Regret probe
   const regret = simulateRegretRating(m.cfMaxDiff, outcomeKind);
   const regretRt = Math.round(2500 + rand() * 2000);
+  const stampRegret = stampPhase(regretRt, "regret_on", "regret_submitted");
   timeMs += regretRt;
   pushRow({
+    ...stampRegret,
     trial_type: "survey-html-form", rt: regretRt,
     phase: "regret_probes", trial_index: idx,
     biome: cell.biome, feedback: cell.feedback,
@@ -419,14 +475,20 @@ for (let idx = 0; idx < trialList.length; idx++) {
     best_alt_block: bestAltBlock, best_alt_kind: bestAltContent.kind, best_alt_payout: bestAltPayout,
     best_alt_adjacent: bestAltAdjacent, n_adjacent_highvalue: nAdjHigh,
     highlight_pattern: null, consider_target_n: considerTargetN,
-    regret_revealed_blocks: revealedBlocks, wallet_after: walletXP,
+    regret_revealed_blocks: revealedBlocks,
+    revealed_kinds: revealedKinds,
+    revealed_payouts: revealedPayouts,
+    revealed_map: revealedMap,
+    wallet_after: walletXP,
     response: JSON.stringify({ regret_chosen: regret })
   });
 
   // 8) Post-ITI
   const postItiMs = jitterMs(POST_ITI_MIN_MS, POST_ITI_MAX_MS);
+  const stampPostIti = stampPhase(postItiMs, "teleport_on", "teleport_off");
   timeMs += postItiMs;
   pushRow({
+    ...stampPostIti,
     trial_type: "html-keyboard-response", rt: null,
     phase: "post_iti", trial_index: idx
   });
