@@ -1932,7 +1932,7 @@
             <li><b>Cave</b> — more mixed, with more valuable resources appearing more often.</li>
             <li><b>Deep Cave</b> — richest overall, with high-value resources appearing most often.</li>
           </ul>
-          <div class="instr-note">Each mining site is independent. What was hidden in one site tells you nothing about what is hidden in the next site. Sometimes, you may be transported from one site to another site in the same biome. The background images will look the same, but remember that each site is unique.</div>
+          <div class="instr-note">Each mining site is a new location within a biome. Though there are some similarities in the general pattern of resource distributions across sites and biomes, no two sites are identical! Sometimes, you may be transported from one site to another site in the same biome. The background images will look the same, but remember that each site is unique.</div>
         </div>
       </div>
       `,
@@ -1992,18 +1992,18 @@
           options: ["True", "False"], required: true },
         { prompt: "A diamond is worth more points than coal.",
           options: ["True", "False"], required: true },
-        { prompt: "Each mining site is independent of the others.",
+        { prompt: "Mining sites in the same biome will always have the same resources in the same blocks.",
+          options: ["True", "False"], required: false },
+        { prompt: "You will always see what was in the block you mined.",
           options: ["True", "False"], required: true },
-        { prompt: "Sometimes you will only see what was in the block you mined.",
-          options: ["True", "False"], required: true },
-        { prompt: "On shortlist sites, you first narrow down which blocks you are seriously considering before choosing one to mine.",
+        { prompt: "On shortlist sites, you will first narrow down which blocks you are seriously considering before choosing one to mine.",
           options: ["True", "False"], required: true }
       ],
       on_finish: (data) => {
         data.correct = (
           data.response["Q0"] === "True" &&
           data.response["Q1"] === "True" &&
-          data.response["Q2"] === "True" &&
+          data.response["Q2"] === "False" &&
           data.response["Q3"] === "True" &&
           data.response["Q4"] === "True"
         );
