@@ -11,7 +11,7 @@ p_load(tidyverse, tidyr, dplyr, ggplot2, stats, sjPlot, readr, ggpubr, patchwork
 ```
 
 ```{r}
-data_raw <- read_csv("../data/data_raw.csv")
+data_raw <- read_csv("../data/prolific/data_raw.csv")
 ```
 # Helpers
 

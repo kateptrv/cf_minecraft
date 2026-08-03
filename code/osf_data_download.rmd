@@ -46,17 +46,17 @@ list.files("data", all.files = TRUE)
 #download all files in the osf project into ../data
 osf_retrieve_node("https://osf.io/Jt9zd/") |>
   osf_ls_files(n_max = Inf) |>
-  osf_download(conflicts = "skip", path = "../data/")
+  osf_download(conflicts = "skip", path = "../data/prolific")
 ```
 
 ```{r}
 # delete files containing "sess-NA" in their filename
-file.remove(list.files(path = "data/", pattern = "sess-NA", full.names = TRUE))
+file.remove(list.files(path = "data/prolific", pattern = "sess-NA", full.names = TRUE))
 ```
 
 ```{r}
 # concatenate files with sess != NA
-data_raw <- list.files(path = "../data/", pattern = "cf_minecraft_pid", full.names = TRUE) |>
+data_raw <- list.files(path = "../data/prolific", pattern = "cf_minecraft_pid", full.names = TRUE) |>
   lapply(read_csv) |>
   bind_rows()
 

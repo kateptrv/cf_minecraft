@@ -24,7 +24,7 @@ showtext_auto()
 ```
 
 ```{r}
-data <- read_csv("../data/data_processed.csv") |>
+data <- read_csv("../data/prolific/data_processed.csv") |>
   filter(comp_tries_to_pass < 2) 
 ```
 
