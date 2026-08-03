@@ -1074,7 +1074,7 @@
         .map((c, i) => (c.feedback === "full" && c.salience !== "none") ? i : -1)
         .filter((i) => i >= 0);
       const shuffledDirectional = jsPsych.randomization.shuffle(directionalIdxs);
-      const NUM_GOOD_TO_BAD = Math.min(12, shuffledDirectional.length);
+      const NUM_GOOD_TO_BAD = Math.min(10, shuffledDirectional.length);
       shuffledDirectional.forEach((idx, j) => {
         cells[idx].comparison_type = j < NUM_GOOD_TO_BAD ? "good_to_bad" : "bad_to_good";
       });
@@ -1205,6 +1205,24 @@
       }
       if (kind === "none") return 0;
       return 0;
+    }
+
+    /* Build parallel arrays + a lookup map describing what was in each
+       revealed block. Used to log the full contents of every revealed CF
+       (not just the focal one) into the CSV. */
+    function buildRevealedRecord(blocks, outcomeMap) {
+      const kinds = [];
+      const payouts = [];
+      const map = {};
+      (blocks || []).forEach((n) => {
+        const c = outcomeMap ? outcomeMap[n] : null;
+        const kind = c ? c.kind : null;
+        const payout = payoutForContent(c);
+        kinds.push(kind);
+        payouts.push(payout);
+        map[n] = { kind, payout };
+      });
+      return { kinds, payouts, map };
     }
 
     function sampleFromProbMap(probMap) {
@@ -1840,6 +1858,7 @@
           },
           data: () => {
             const cell = getCell();
+            const rec = buildRevealedRecord(state.revealed_blocks, state.outcome_map);
             return {
               phase: "counterfactual_feedback",
               trial_index: idx,
@@ -1850,6 +1869,9 @@
               comparison_type: state.cf_comparison_label || cell.comparison_type,
               forced_creeper_trial: !!cell.forced_creeper_trial,
               revealed_blocks: state.revealed_blocks,
+              revealed_kinds: rec.kinds,
+              revealed_payouts: rec.payouts,
+              revealed_map: rec.map,
               focal_cf_block: state.focal_cf_block,
               focal_cf_kind: state.focal_cf_content ? state.focal_cf_content.kind : null,
               focal_cf_payout: state.focal_cf_payout,
@@ -1958,6 +1980,10 @@
           data.highlight_pattern = state.highlight_pattern;
           data.consider_target_n = state.consider_target_n;
           data.regret_revealed_blocks = state.regret_revealed_blocks;
+          const rec = buildRevealedRecord(state.regret_revealed_blocks, state.outcome_map);
+          data.revealed_kinds = rec.kinds;
+          data.revealed_payouts = rec.payouts;
+          data.revealed_map = rec.map;
           data.wallet_after = wallet;
         }
       }, "regret_on", "regret_submitted"));

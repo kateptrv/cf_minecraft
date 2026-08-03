@@ -197,7 +197,7 @@ function buildTrialList() {
     .map((c, i) => (c.feedback === "full" && c.salience !== "none") ? i : -1)
     .filter((i) => i >= 0);
   const shuffledDirectional = shuffle(directionalIdxs);
-  const NUM_GOOD_TO_BAD = Math.min(12, shuffledDirectional.length);
+  const NUM_GOOD_TO_BAD = Math.min(10, shuffledDirectional.length);
   shuffledDirectional.forEach((idx, j) => {
     cells[idx].comparison_type = j < NUM_GOOD_TO_BAD ? "good_to_bad" : "bad_to_good";
   });
@@ -235,7 +235,8 @@ const COLUMNS = [
   "outcome_kind", "outcome_payout", "creeper_severity",
   "focal_cf_block", "focal_cf_kind", "focal_cf_payout", "cf_max_diff", "cf_best_alt_value",
   "best_alt_block", "best_alt_kind", "best_alt_payout", "best_alt_adjacent", "n_adjacent_highvalue",
-  "revealed_blocks", "regret_revealed_blocks", "wallet_after",
+  "revealed_blocks", "revealed_kinds", "revealed_payouts", "revealed_map",
+  "regret_revealed_blocks", "wallet_after",
   "response",
   // physio-alignment timestamps + event markers
   "epoch_start_ms", "epoch_end_ms", "perf_start_ms", "perf_end_ms",
@@ -428,6 +429,12 @@ for (let idx = 0; idx < trialList.length; idx++) {
 
   // 6) Counterfactual feedback
   const revealedBlocks = cell.feedback === "full" ? considerRevealedPool : [];
+  const revealedKinds = revealedBlocks.map((n) => board[n] ? board[n].kind : null);
+  const revealedPayouts = revealedBlocks.map((n) => payoutForContent(board[n]));
+  const revealedMap = {};
+  revealedBlocks.forEach((n) => {
+    revealedMap[n] = { kind: board[n] ? board[n].kind : null, payout: payoutForContent(board[n]) };
+  });
   const stampCf = stampPhase(COUNTERFACTUAL_MS, "cf_on", "cf_off");
   timeMs += COUNTERFACTUAL_MS;
   pushRow({
@@ -438,6 +445,9 @@ for (let idx = 0; idx < trialList.length; idx++) {
     salience: cell.salience, salience_mode: cell.salience_mode, salience_count: salienceCount,
     comparison_type: cfLabel || cell.comparison_type, forced_creeper_trial: false,
     revealed_blocks: revealedBlocks,
+    revealed_kinds: revealedKinds,
+    revealed_payouts: revealedPayouts,
+    revealed_map: revealedMap,
     focal_cf_block: m.focalCfBlock, focal_cf_kind: m.focalCfContent ? m.focalCfContent.kind : null,
     focal_cf_payout: m.focalCfPayout, cf_max_diff: m.cfMaxDiff, cf_best_alt_value: m.cfBestAltValue,
     best_alt_block: bestAltBlock, best_alt_kind: bestAltContent.kind, best_alt_payout: bestAltPayout,
@@ -465,7 +475,11 @@ for (let idx = 0; idx < trialList.length; idx++) {
     best_alt_block: bestAltBlock, best_alt_kind: bestAltContent.kind, best_alt_payout: bestAltPayout,
     best_alt_adjacent: bestAltAdjacent, n_adjacent_highvalue: nAdjHigh,
     highlight_pattern: null, consider_target_n: considerTargetN,
-    regret_revealed_blocks: revealedBlocks, wallet_after: walletXP,
+    regret_revealed_blocks: revealedBlocks,
+    revealed_kinds: revealedKinds,
+    revealed_payouts: revealedPayouts,
+    revealed_map: revealedMap,
+    wallet_after: walletXP,
     response: JSON.stringify({ regret_chosen: regret })
   });
 
