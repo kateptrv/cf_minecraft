@@ -13,6 +13,7 @@
     <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-fullscreen@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe"></script>
     <link href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -32,7 +33,7 @@
            always fits. Caps at 92px on big screens, floors at 44px on phones. */
         --tile-size: clamp(44px, 10.5vmin, 92px);
         --tile-gap: clamp(6px, 1.4vmin, 12px);
-        --grid-cols: 4;
+        --grid-cols: 3;
         --accent: #ffd84d;
         --accent-strong: #ffb400;
         --cyan: #5bc8ff;
@@ -204,6 +205,64 @@
       .stage #choice-hint b, .stage #consider-banner b,
       .stage .biome-rate b, .stage p b { color: #fff; }
 
+      /* Grid layout: Y-coord labels on the left, tile grid centered on the page.
+         Using a 1fr auto 1fr template so the middle (tile) column sits exactly
+         in the middle of the viewport, while the Y label column hangs off its
+         left edge and the right spacer balances the visual weight. */
+      .roulette-wrap {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        column-gap: clamp(10px, 1.6vw, 18px);
+        row-gap: clamp(14px, 2.4vw, 24px);
+        align-items: center;
+        margin: 14px auto 6px;
+        width: 100%;
+      }
+      .y-coord-label {
+        grid-column: 1;
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        color: #ffffff;
+        font-family: 'Press Start 2P', monospace;
+        font-size: clamp(12px, 1.5vw, 16px);
+        line-height: 1;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.75);
+        padding: 6px 12px;
+        background: rgba(20,22,30,0.55);
+        border-radius: 8px;
+        letter-spacing: 0.03em;
+      }
+      .y-coord-label .y-tag {
+        opacity: 1;
+        font-size: 1em;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .roulette-row {
+        grid-column: 2;
+        display: grid;
+        grid-template-columns: repeat(var(--grid-cols), var(--tile-size));
+        grid-gap: var(--tile-gap);
+      }
+      /* Header row that labels the "Y coordinate" column above the numbers */
+      .y-coord-header {
+        grid-column: 1;
+        justify-self: end;
+        font-family: 'Press Start 2P', monospace;
+        color: rgba(245,245,247,0.85);
+        font-size: clamp(10px, 1.2vw, 13px);
+        text-align: right;
+        padding-right: 4px;
+        letter-spacing: 0.05em;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+      }
+      /* Suppress the second (blank) header slot — no longer needed with the
+         1fr/auto/1fr grid, since the tile column has no header text. */
+      .y-coord-header + .y-coord-header { display: none; }
+      /* Legacy selector kept so existing rules still target tile grids */
       .roulette-grid {
         display: grid;
         grid-template-columns: repeat(var(--grid-cols), var(--tile-size));
@@ -784,10 +843,18 @@
     /**********************************
      Design parameters
     ***********************************/
-    const GRID_COLS = 4;
-    const GRID_ROWS = 4;
+    const GRID_COLS = 3;
+    const GRID_ROWS = 3;
     const GRID_N = GRID_COLS * GRID_ROWS;
     const NUMBERS = Array.from({ length: GRID_N }, (_, i) => i + 1);
+
+    // Minecraft-style Y coordinate labels per biome, top row (higher altitude)
+    // to bottom row (deeper). Preserves the "deeper = richer" gradient.
+    const BIOME_Y_COORDS = {
+      overworld: [90, 75, 60],
+      cave:      [50, 35, 20],
+      deep:      [10, -5, -20]
+    };
 
     /* Ore tiers — value in points. Creepers cost points based on severity (1-4). */
     const ORES = {
@@ -830,24 +897,26 @@
       }
     };
 
+    /* 3 rows per biome. Rows 1 and 3 keep the endpoints of the original
+       4-row design; row 2 is the pointwise average of the original middle
+       two rows. Per-biome expected-value averages stay within ~0.02 XP of
+       the 4-row version, so biome-to-biome gradients are preserved:
+         overworld ≈ 1.09,  cave ≈ 1.53,  deep ≈ 2.02  (XP per random pick). */
     const ROW_OUTCOME_DISTS = {
       overworld: [
-        { none: 0.60, coal: 0.28, copper: 0.08, iron: 0.03, diamond: 0.01 },
-        { none: 0.52, coal: 0.26, copper: 0.12, iron: 0.07, diamond: 0.03 },
-        { none: 0.44, coal: 0.22, copper: 0.14, iron: 0.12, diamond: 0.08 },
-        { none: 0.34, coal: 0.16, copper: 0.16, iron: 0.16, diamond: 0.18 }
+        { none: 0.60,  coal: 0.28,  copper: 0.08,  iron: 0.03,   diamond: 0.01  },
+        { none: 0.48,  coal: 0.24,  copper: 0.13,  iron: 0.095,  diamond: 0.055 },
+        { none: 0.34,  coal: 0.16,  copper: 0.16,  iron: 0.16,   diamond: 0.18  }
       ],
       cave: [
-        { none: 0.52, coal: 0.20, copper: 0.14, iron: 0.09, diamond: 0.05 },
-        { none: 0.44, coal: 0.16, copper: 0.16, iron: 0.14, diamond: 0.10 },
-        { none: 0.36, coal: 0.12, copper: 0.16, iron: 0.18, diamond: 0.18 },
-        { none: 0.28, coal: 0.08, copper: 0.14, iron: 0.22, diamond: 0.28 }
+        { none: 0.52,  coal: 0.20,  copper: 0.14,  iron: 0.09,   diamond: 0.05  },
+        { none: 0.40,  coal: 0.14,  copper: 0.16,  iron: 0.16,   diamond: 0.14  },
+        { none: 0.28,  coal: 0.08,  copper: 0.14,  iron: 0.22,   diamond: 0.28  }
       ],
       deep: [
-        { none: 0.42, coal: 0.10, copper: 0.16, iron: 0.18, diamond: 0.14 },
-        { none: 0.36, coal: 0.08, copper: 0.14, iron: 0.20, diamond: 0.22 },
-        { none: 0.30, coal: 0.06, copper: 0.12, iron: 0.20, diamond: 0.32 },
-        { none: 0.24, coal: 0.04, copper: 0.10, iron: 0.20, diamond: 0.42 }
+        { none: 0.42,  coal: 0.10,  copper: 0.16,  iron: 0.18,   diamond: 0.14  },
+        { none: 0.33,  coal: 0.07,  copper: 0.13,  iron: 0.20,   diamond: 0.27  },
+        { none: 0.24,  coal: 0.04,  copper: 0.10,  iron: 0.20,   diamond: 0.42  }
       ]
     };
 
@@ -862,7 +931,7 @@
     /* Salience magnitude: none = 0 blocks, little = 2 blocks, a_lot = 8 blocks.
        Salience mode is always "consider" (highlight mode removed). */
     const SALIENCE_TYPES   = ["none", "little", "a_lot"];
-    const SALIENCE_COUNTS  = { none: 0, little: 2, a_lot: 8 };
+    const SALIENCE_COUNTS  = { none: 0, little: 2, a_lot: 6 };
 
     /* On full-feedback salient trials, the revealed counterfactual blocks should
       be uniformly directional relative to the chosen block: either every revealed
@@ -1063,25 +1132,46 @@
         consideredSet = [],
         disabledSet = [],
         chosenBlock = null,
-        revealMap = null
+        crackingBlock = null,        // draws the anticipation "cracking" tile animation
+        revealMap = null,
+        biomeKey = null              // "overworld" | "cave" | "deep" — enables Y coords
       } = opts || {};
 
-      let html = `<div class='roulette-grid'>`;
-      NUMBERS.forEach((n) => {
-        const classes = ["roulette-number"];
-        if (biomeBg === "deep")     classes.push("deep-bg");
-        if (biomeBg === "andesite") classes.push("andesite-bg");
-        if (highlightSet.includes(n))   classes.push("highlight");
-        if (consideredSet.includes(n))  classes.push("considered");
-        if (disabledSet.includes(n))    classes.push("disabled");
-        if (chosenBlock !== null && n === chosenBlock) classes.push("chosen");
+      const yCoords = biomeKey ? BIOME_Y_COORDS[biomeKey] : null;
 
-        let inner = ``;
-        if (revealMap && revealMap[n]) inner += renderTileContent(revealMap[n]);
+      // Build one .roulette-row per grid row; put the block group inside a
+      // .roulette-wrap that pairs each row with its Y-coordinate label.
+      let html = `<div class='roulette-wrap'>`;
+      if (yCoords) {
+        html += `<div class='y-coord-header'>Y coord</div>`;
+        html += `<div class='y-coord-header'>&nbsp;</div>`;
+      }
+      for (let r = 0; r < GRID_ROWS; r++) {
+        if (yCoords) {
+          const y = yCoords[r];
+          const yStr = y >= 0 ? `y=${y}` : `y=${y}`;   // preserves the minus sign
+          html += `<div class='y-coord-label'><span class='y-tag'>${yStr}</span></div>`;
+        }
+        html += `<div class='roulette-row'>`;
+        for (let c = 0; c < GRID_COLS; c++) {
+          const n = r * GRID_COLS + c + 1;
+          const classes = ["roulette-number"];
+          if (biomeBg === "deep")     classes.push("deep-bg");
+          if (biomeBg === "andesite") classes.push("andesite-bg");
+          if (highlightSet.includes(n))   classes.push("highlight");
+          if (consideredSet.includes(n))  classes.push("considered");
+          if (disabledSet.includes(n))    classes.push("disabled");
+          if (chosenBlock !== null && n === chosenBlock) classes.push("chosen");
+          if (crackingBlock !== null && n === crackingBlock) classes.push("cracking");
 
-        html += `<div class='${classes.join(" ")}' data-num='${n}'
-                      role='button' tabindex='0' aria-label='Block ${n}'>${inner}</div>`;
-      });
+          let inner = ``;
+          if (revealMap && revealMap[n]) inner += renderTileContent(revealMap[n]);
+
+          html += `<div class='${classes.join(" ")}' data-num='${n}'
+                        role='button' tabindex='0' aria-label='Block ${n}'>${inner}</div>`;
+        }
+        html += `</div>`;
+      }
       html += `</div>`;
       return html;
     }
@@ -1386,6 +1476,7 @@
               </div>
               ${banner}
               ${makeGrid({
+                biomeKey: cell.biome,
                 biomeBg: biome.bg,
                 highlightSet: cell.salience_mode === "highlight" ? state.salience_set : [],
                 consideredSet: [],
@@ -1582,21 +1673,20 @@
             payoutForContent(state.outcome_map[n]) > chosenVal
           ).length;
 
-          let html = `
+          // Use makeGrid so the anticipation "Mining..." screen has the same
+          // 3×3 layout + Y-coord labels as every other trial phase.
+          const disabledExceptChosen = NUMBERS.filter((n) => n !== state.choice);
+          return `
             <div class="stage ${biome.cls}">
               <h3 style="color: var(--ink); margin: 0 0 14px;">Mining...</h3>
-              <div class='roulette-grid'>
+              ${makeGrid({
+                biomeKey: cell.biome,
+                biomeBg: biome.bg,
+                disabledSet: disabledExceptChosen,
+                crackingBlock: state.choice
+              })}
+            </div>
           `;
-          NUMBERS.forEach((n) => {
-            const cls = ["roulette-number"];
-            if (cell.biome === "deep") cls.push("deep-bg");
-            else if (cell.biome === "cave") cls.push("andesite-bg");
-            if (n === state.choice) cls.push("cracking");
-            else cls.push("disabled");
-            html += `<div class='${cls.join(" ")}'></div>`;
-          });
-          html += `</div></div>`;
-          return html;
         },
         data: () => ({ phase: "anticipation", trial_index: idx })
       }, "anticipation_on", "anticipation_off"));
@@ -1644,6 +1734,7 @@
                 ${headline}
               </div>
               ${makeGrid({
+                biomeKey: cell.biome,
                 biomeBg: biome.bg,
                 revealMap: revealMap,
                 disabledSet: NUMBERS,
@@ -1738,6 +1829,7 @@
                   Your chosen block is outlined in green.
                 </p>
                 ${makeGrid({
+                  biomeKey: cell.biome,
                   biomeBg: biome.bg,
                   revealMap: revealMap,
                   disabledSet: NUMBERS,
@@ -1795,6 +1887,7 @@
             <div class="stage ${biome.cls}"
                  style="--tile-size: clamp(40px, 8.5vmin, 68px); --tile-gap: clamp(5px, 1vmin, 8px); min-height: auto; padding: clamp(14px, 2.4vw, 24px) clamp(14px, 2.6vw, 28px); gap: clamp(10px, 1.6vw, 14px);">
               ${makeGrid({
+                biomeKey: getCell().biome,
                 biomeBg: biome.bg,
                 revealMap: revealMap,
                 disabledSet: NUMBERS,
@@ -1900,8 +1993,8 @@
         <div class="instr-text">
           <p>You're going to play a short Minecraft-style mining game.</p>
           <p>Your job is simple: at each mining site, decide which single block to mine and try to get the most valuable resources.</p>
-          <p>You will be <b>teleported from one mining site to another</b>, visiting <b>66 sites total</b> over the course of the game. Each site will have 16 blocks arranged in a 4x4 grid for you to choose from.</p>
-          <div class="instr-note">Each point you earn is worth 1 cent on top of the base payment of $6.00!</div>
+          <p>You will be <b>teleported from one mining site to another</b>, visiting <b>66 sites total</b> over the course of the game. Each site will have 9 blocks arranged in a 3×3 grid for you to choose from.</p>
+          <div class="instr-note">You'll receive a <b>$15 Amazon gift card</b> for participating. On top of that, every <b>10 XP</b> you earn in the mining task counts as one <b>raffle entry for a chance to win a Lego set</b> — drawing conducted in <b>December 2026</b>.</div>
         </div>
       </div>
       `,
@@ -1941,8 +2034,9 @@
         <img class="instr-hero" src="img/grid.png" alt="Grid">
         <div class="instr-title">How mining sites work</div>
         <div class="instr-text">
-          <p>When you arrive at a site, the contents of all 16 blocks are already set — you just do not know which blocks are most valuable yet.</p>
-          <p>Over time, you may be able to learn which locations in the 4 × 4 mining area tend to be more valuable than others.</p>
+          <p>When you arrive at a site, the contents of all 9 blocks are already set — you just do not know which blocks are most valuable yet.</p>
+          <p>Over time, you may be able to learn which <b>rows</b> in the mining area tend to be more valuable than others.</p>
+          <p>Each row is labeled with its <b>Y coordinate</b> (the Minecraft-style depth) on the left of the grid.</p>
         </div>
       </div>
       `,
@@ -1961,8 +2055,8 @@
         <img class="instr-hero" src="img/consider.png" alt="Consider">
         <div class="instr-title">Considered blocks</div>
         <div class="instr-text">
-          <p>On other sites, you will first be asked to carefully <b>consider</b> either 2 or 8 blocks you want to mine before making your final choice. This means narrowing down the set of blocks you are seriously considering before choosing which one to mine. At first, your choices of which blocks to consider may seem random. Over time, you will learn to consider blocks that you suspect might have the most valuable resources.</p>
-          <p>On some sites, you will see not only what your chosen block contained, but also what the other blocks you considered contained, providing you with more information about which locations might be more valuable than others.</p>
+          <p>On other sites, you will first be asked to carefully <b>consider</b> either 2 or 6 blocks you want to mine before making your final choice. This means narrowing down the set of blocks you are seriously considering before choosing which one to mine. At first, your choices of which blocks to consider may seem random. Over time, you will learn to consider blocks that you suspect might have the most valuable resources.</p>
+          <p>On some sites, you will see not only what your chosen block contained, but also what the other blocks you considered contained, providing you with more information about which <b>rows</b> might be more valuable than others.</p>
         </div>
       </div>
       `,
@@ -2062,7 +2156,7 @@
             Please close other tabs and windows now.
           </p>
           <p style="color: rgba(245,245,247,0.7); font-size: 13px; margin-top: 8px;">
-            Do not press Escape or refresh during the study — your data and bonus will be lost.
+            Do not press Escape or refresh during the study — your data and raffle entries will be lost.
           </p>
         </div>
       `,
@@ -2075,7 +2169,39 @@
       delay_after: 0
     };
 
+    /**********************************
+     Preload all images so trials never hit the network mid-experiment
+     (some sessions have lost coal/copper/etc. tiles on flaky wifi).
+    ***********************************/
+    const PRELOAD_IMAGES = [
+      "img/andesite.png",  "img/biome_cave.png", "img/biome_deep.png",
+      "img/biome_surface.png", "img/coal.png",   "img/consider.png",
+      "img/copper.png",    "img/creeper.png",    "img/deep.png",
+      "img/diamond.png",   "img/grid.png",       "img/iron.png",
+      "img/ore_deep.png",  "img/ore_stone.png",  "img/outcome.png",
+      "img/pearl.png",     "img/pickaxe.png",    "img/regret.png",
+      "img/stone.png",     "img/xp.png"
+    ];
+    const preload = {
+      type: jsPsychPreload,
+      images: PRELOAD_IMAGES,
+      show_progress_bar: true,
+      show_detailed_errors: true,
+      message: `
+        <div class="instr-wrap">
+          <div class="instr-title">Loading assets…</div>
+          <p style="color: rgba(245,245,247,0.7);">
+            Preparing images so the game runs smoothly.
+          </p>
+        </div>
+      `,
+      error_message: "Some images failed to load. Please refresh and try again, or notify the experimenter.",
+      max_load_time: 30000,
+      continue_after_error: true
+    };
+
     let timeline = [];
+    timeline.push(preload);
     timeline.push(consent);
     timeline.push(enter_fullscreen);
     timeline.push(loop_node);
@@ -2162,22 +2288,23 @@
     ***********************************/
     timeline.push({
       type: jsPsychHtmlButtonResponse,
-      choices: ["Return to Prolific"],
-      button_html: (choice) => `<button class="jspsych-btn continue-btn">${choice}</button>`,
+      choices: [],   // no button — this is a terminal screen
       stimulus: () => {
         const lastSave = jsPsych.data.get().filter({ phase: "datapipe_save" }).last(1).values()[0];
         const saveFailed = !IS_DEBUG_RUN && lastSave && lastSave.success === false;
         if (saveFailed) {
           return `
             <div class="instr-wrap">
-              <img class="instr-hero" src="img/creeper.png" alt="Warning">
+              <img class="instr-hero" src="img/pickaxe.png" alt="Warning">
               <div class="instr-title">Data save failed</div>
               <p style="color: rgba(245,245,247,0.85); max-width: 560px;">
-                We could not reach the data server. Please contact the experimenter
-                (Kate Petrova, kpetrova@stanford.edu) and include your Prolific ID
-                <b>${PROLIFIC_PID}</b>. Your participation will still be honored.
+                We could not reach the data server. Please <b>notify the experimenter</b>
+                right away so they can save your data locally. Your participation will
+                still be honored.
               </p>
-              <p style="color: rgba(245,245,247,0.65);">Click below to return to Prolific.</p>
+              <p style="color: rgba(245,245,247,0.7); margin-top: 18px;">
+                Please <b>remain seated</b> — the experimenter will be with you shortly.
+              </p>
             </div>
           `;
         }
@@ -2185,19 +2312,16 @@
           <div class="instr-wrap">
             <img class="instr-hero" src="img/pickaxe.png" alt="Pickaxe">
             <div class="instr-title">All done!</div>
-            <p style="color: rgba(245,245,247,0.78);">
+            <p style="color: rgba(245,245,247,0.82); max-width: 560px;">
               ${IS_DEBUG_RUN
                 ? "Debug mode: your CSV has been downloaded locally."
-                : "Your data has been saved successfully."}
+                : "Thanks for playing! Your data has been saved successfully."}
             </p>
-            <p style="color: rgba(245,245,247,0.78);">
-              Click below to return to Prolific and complete your submission.
+            <p style="color: rgba(245,245,247,0.82); margin-top: 22px; font-size: 1.05em;">
+              Please <b>remain seated</b> — the experimenter will be with you shortly.
             </p>
           </div>
         `;
-      },
-      on_finish: () => {
-        if (!IS_DEBUG_RUN) window.location.href = PROLIFIC_COMPLETE_URL;
       }
     });
 
