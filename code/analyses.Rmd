@@ -24,5 +24,480 @@ showtext_auto()
 ```
 
 ```{r}
-data <- read_csv("../data/data_processed.csv")
+data <- read_csv("../data/data_processed.csv") |>
+  filter(comp_tries_to_pass < 2) 
+```
+
+```{r}
+library(ggplot2)
+library(ggdist)
+library(ggtext)
+library(dplyr)
+library(glue)
+
+img_dir <- "../docs/img"
+
+# Ore icons on the x-axis
+ore_label <- function(kind, size = 30) {
+  if (kind == "none") {
+    glue("<img src='{img_dir}/stone.png' width='{size}' style='opacity:0.55;' />")
+  } else {
+    glue("<img src='{img_dir}/{kind}.png' width='{size}' />")
+  }
+}
+ore_labels <- setNames(
+  vapply(c("none","coal","copper","iron","diamond"), ore_label, character(1)),
+  c("none","coal","copper","iron","diamond")
+)
+
+biome_labels <- c(
+  overworld = "Overworld",
+  cave      = "Cave",
+  deep      = "Deep Cave"
+)
+
+data |>
+  filter(comparison_type != "bad_to_good") |>
+  mutate(
+    biome = factor(biome, levels = c("overworld","cave","deep")),
+    outcome_kind = factor(outcome_kind, levels = c("none","coal","copper","iron","diamond"))
+  ) |>
+  ggplot(aes(x = outcome_kind, y = regret, fill = feedback, color = feedback)) +
+  ggdist::stat_halfeye(
+    aes(group = interaction(outcome_kind, feedback)),
+    adjust = 0.5, justification = 0, scale = 0.4,
+    .width = 0, point_colour = NA, alpha = .5,
+    slab_linewidth = 0.5,
+    position = position_dodge(width = .7)
+  ) +
+  ggdist::stat_dots(
+    aes(group = interaction(outcome_kind, feedback)),
+    side = "right", justification = 0,
+    binwidth = 0.25, linewidth = 0.5, alpha = 1,
+    position = position_dodge(width = .7)
+  ) +
+  stat_summary(
+    aes(group = feedback),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange",
+    linewidth = 1, size = 1, shape = 21,
+    position = position_dodge(width = .7)
+  ) +
+  facet_wrap(~ biome, labeller = as_labeller(biome_labels)) +
+  scale_x_discrete(labels = ore_labels, expand = expansion(add = 0.6)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(
+    values = c("partial" = "#6c7a89", "full"  = "#3aa05a"),
+    labels = c("Partial", "Full"),
+    name   = "Feedback"
+  ) +
+  scale_color_manual(
+    values = c("partial" = "#2f3a47", "full"  = "#1f6b3a"),
+    labels = c("Partial", "Full"),
+    name   = "Feedback"
+  ) +
+  labs(
+    x = NULL,
+    y = "Regret rating (0–100)",
+    title    = "Regret by mined outcome, broken out by biome and feedback type",
+    subtitle = "Each dot is one trial · pointranges are mean ± 95% bootstrap CI"
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.x          = ggtext::element_markdown(margin = margin(t = 4)),
+    axis.ticks.x         = element_blank(),
+    strip.text           = element_text(face = "bold", size = 12,
+                                        margin = margin(t = 6, b = 6)),
+    strip.background     = element_rect(fill = "grey95", colour = NA),
+    panel.spacing.x      = unit(18, "pt"),
+    panel.grid.major.y   = element_line(colour = "grey92", linewidth = 0.4),
+    legend.position      = "top",
+    legend.justification = "left",
+    plot.title           = element_text(face = "bold"),
+    plot.subtitle        = element_text(colour = "grey40", size = 10,
+                                        margin = margin(b = 10))
+  )
+```
+
+```{r}
+library(ggplot2)
+library(ggdist)
+library(ggtext)
+library(dplyr)
+library(glue)
+
+# ---- Shared setup ---------------------------------------------------------
+img_dir <- "../docs/img"
+
+ore_label <- function(kind, size = 28) {
+  if (kind == "none") {
+    glue("<img src='{img_dir}/stone.png' width='{size}' style='opacity:0.55;' />")
+  } else {
+    glue("<img src='{img_dir}/{kind}.png' width='{size}' />")
+  }
+}
+ore_labels <- setNames(
+  vapply(c("none","coal","copper","iron","diamond"), ore_label, character(1)),
+  c("none","coal","copper","iron","diamond")
+)
+
+biome_labels <- c(overworld = "Overworld", cave = "Cave", deep = "Deep Cave")
+
+feedback_fill   <- c(partial = "#6c7a89", full = "#3aa05a")
+feedback_colour <- c(partial = "#2f3a47", full = "#1f6b3a")
+
+# pre-process once
+d <- data |>
+  mutate(
+    biome         = factor(biome, levels = c("overworld","cave","deep")),
+    outcome_kind  = factor(outcome_kind,  levels = c("none","coal","copper","iron","diamond")),
+    best_alt_kind = factor(best_alt_kind, levels = c("none","coal","copper","iron","diamond")),
+    salience_count = factor(salience_count, levels = c(0, 2, 8),
+                            labels = c("0 (none)", "2 (little)", "8 (a lot)")),
+    best_alt_adjacent = factor(best_alt_adjacent,
+                               levels = c(FALSE, TRUE),
+                               labels = c("Not adjacent", "Adjacent"))
+  )
+
+base_theme <- theme_classic(base_size = 12) +
+  theme(
+    axis.ticks.x         = element_blank(),
+    strip.text           = element_text(face = "bold", size = 12,
+                                        margin = margin(t = 6, b = 6)),
+    strip.background     = element_rect(fill = "grey95", colour = NA),
+    panel.spacing        = unit(18, "pt"),
+    panel.grid.major.y   = element_line(colour = "grey92", linewidth = 0.4),
+    legend.position      = "top",
+    legend.justification = "left",
+    plot.title           = element_text(face = "bold"),
+    plot.subtitle        = element_text(colour = "grey40", size = 10,
+                                        margin = margin(b = 10))
+  )
+
+
+# ============================================================================
+# 1. Regret × salience count × feedback (faceted by biome)
+#    Does seeing more "shortlisted" alternatives change regret?
+# ============================================================================
+
+
+
+# ============================================================================
+# 2. Regret × best_alt_kind (what was the best block they could have mined?)
+#    Faceted by feedback — does knowing the alternative matter?
+# ============================================================================
+p_best_alt_kind <- d |>
+  filter(!is.na(best_alt_kind)) |>
+  ggplot(aes(x = best_alt_kind, y = regret, fill = feedback, color = feedback)) +
+  ggdist::stat_halfeye(
+    aes(group = interaction(best_alt_kind, feedback)),
+    adjust = 0.5, justification = 0, scale = 0.4,
+    .width = 0, point_colour = NA, alpha = .5,
+    slab_linewidth = 0.5,
+    position = position_dodge(width = .7)
+  ) +
+  ggdist::stat_dots(
+    aes(group = interaction(best_alt_kind, feedback)),
+    side = "right", justification = 0,
+    binwidth = 0.25, linewidth = 0.5, alpha = 1,
+    position = position_dodge(width = .7)
+  ) +
+  stat_summary(
+    aes(group = feedback),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange",
+    linewidth = 1, size = 1, shape = 21,
+    position = position_dodge(width = .7)
+  ) +
+  facet_wrap(~ biome, labeller = as_labeller(biome_labels)) +
+  scale_x_discrete(labels = ore_labels, expand = expansion(add = 0.6)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(values = feedback_fill,    name = "Feedback",
+                    labels = c("Partial","Full")) +
+  scale_color_manual(values = feedback_colour, name = "Feedback",
+                     labels = c("Partial","Full")) +
+  labs(
+    x = NULL,
+    y = "Regret rating (0–100)",
+    title    = "Regret by the best block they could have mined",
+    subtitle = "X-axis = best alternative across the full board · dots = trials"
+  ) +
+  base_theme +
+  theme(axis.text.x = ggtext::element_markdown(margin = margin(t = 4)))
+
+
+# ============================================================================
+# 3. Regret as a function of the chosen-vs-best gap (best_alt_payout − outcome_payout)
+#    A continuous regret-by-counterfactual-gap relationship, colored by feedback.
+# ============================================================================
+p_gap <- d |>
+  mutate(gap_to_best_alt = best_alt_value - outcome_value) |>
+  filter(!is.na(gap_to_best_alt)) |>
+  filter(feedback == "full") |>
+  ggplot(aes(x = gap_to_best_alt, y = regret)) +
+  geom_jitter(width = 0.18, height = 0, alpha = 0.35, size = 1.6) +
+  geom_smooth(method = "lm", linewidth = 1.1, alpha = 0.18, se = TRUE) +
+  stat_summary(
+    aes(group = feedback),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange", linewidth = 1, size = 0.9, shape = 21,
+    color = "black"
+  ) +
+  facet_wrap(~ cf_gap) +
+  scale_x_continuous(breaks = 0:4) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  # scale_fill_manual(values = feedback_fill,    name = "Feedback",
+  #                   labels = c("Partial","Full")) +
+  # scale_color_manual(values = feedback_colour, name = "Feedback",
+  #                    labels = c("Partial","Full")) +
+  labs(
+    x = "Gap to best alternative (best_alt_payout − outcome_payout)",
+    y = "Regret rating (0–100)",
+    title    = "Regret scales with the gap between what you got and the best you could have gotten",
+    subtitle = "Black pointranges = mean ± 95% bootstrap CI at each integer gap"
+  ) +
+  base_theme
+
+
+# ============================================================================
+# 4. Regret × best_alt_adjacent (was the best block right next to mine?)
+#    Spatial-proximity effect — feels worse when you "almost" got it.
+# ============================================================================
+p_adjacent <- d |>
+  filter(!is.na(best_alt_adjacent)) |>
+  ggplot(aes(x = best_alt_adjacent, y = regret, fill = feedback, color = feedback)) +
+  ggdist::stat_halfeye(
+    aes(group = interaction(best_alt_adjacent, feedback)),
+    adjust = 0.5, justification = 0, scale = 0.45,
+    .width = 0, point_colour = NA, alpha = .5,
+    slab_linewidth = 0.5,
+    position = position_dodge(width = .7)
+  ) +
+  ggdist::stat_dots(
+    aes(group = interaction(best_alt_adjacent, feedback)),
+    side = "right", justification = 0,
+    binwidth = 0.25, linewidth = 0.5, alpha = 1,
+    position = position_dodge(width = .7)
+  ) +
+  stat_summary(
+    aes(group = feedback),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange", linewidth = 1, size = 1, shape = 21,
+    position = position_dodge(width = .7)
+  ) +
+  facet_wrap(~ biome, labeller = as_labeller(biome_labels)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(values = feedback_fill,    name = "Feedback",
+                    labels = c("Partial","Full")) +
+  scale_color_manual(values = feedback_colour, name = "Feedback",
+                     labels = c("Partial","Full")) +
+  labs(
+    x = "Best alternative spatial proximity",
+    y = "Regret rating (0–100)",
+    title    = "Does it feel worse when the best block was right next to yours?",
+    subtitle = "Adjacent = the best alternative shares an edge with the mined block"
+  ) +
+  base_theme
+
+
+# ============================================================================
+# 5. Heatmap of mean regret across outcome × best_alt (the full 5×5 grid)
+#    Diagonal = you picked the best · upper triangle = better alternatives existed.
+# ============================================================================
+p_heatmap <- d |>
+  filter(!is.na(outcome_kind), !is.na(best_alt_kind)) |>
+  group_by(outcome_kind, best_alt_kind) |>
+  filter(feedback == "full") |>
+  summarise(mean_regret = mean(regret, na.rm = TRUE),
+            n = dplyr::n(),
+            .groups = "drop") |>
+  ggplot(aes(x = best_alt_kind, y = outcome_kind, fill = mean_regret)) +
+  geom_tile(color = "white", linewidth = 0.8) +
+  geom_text(aes(label = ifelse(is.na(mean_regret), "",
+                               sprintf("%.0f\n(n=%d)", mean_regret, n)),
+                color = mean_regret > 55),
+            size = 3.4, lineheight = 0.9, show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "grey20", "TRUE" = "white")) +
+  scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey92",
+                       name = "Mean regret") +
+  scale_x_discrete(labels = ore_labels, expand = c(0, 0)) +
+  scale_y_discrete(labels = ore_labels, expand = c(0, 0)) +
+  coord_fixed() +
+  labs(
+    x = "Best block they could have mined",
+    y = "Block they actually mined",
+    title    = "Mean regret by mined outcome × best-available alternative",
+    subtitle = "Diagonal = you mined the best block · cell numbers = mean regret (trial n)"
+  ) +
+  base_theme +
+  theme(
+    axis.text.x = ggtext::element_markdown(margin = margin(t = 4)),
+    axis.text.y = ggtext::element_markdown(margin = margin(r = 4)),
+    panel.grid  = element_blank()
+  )
+
+
+# ============================================================================
+# 6. Full-feedback only: regret as a function of revealed CF gap (cf_max_diff),
+#    split by comparison_type — the actual counterfactual that participants saw.
+# ============================================================================
+p_cf <- d |>
+  filter(feedback == "full",
+         comparison_type %in% c("good_to_bad", "bad_to_good")) |>
+  mutate(
+    comparison_type = factor(
+      comparison_type,
+      levels = c("good_to_bad", "bad_to_good"),
+      labels = c("Chosen > revealed CFs", "Chosen < revealed CFs")
+    )
+  ) |>
+  filter(salience_count == 2 | 8) |>
+  mutate(cf_max_diff = outcome_value - best_alt_value) |>
+  ggplot(aes(x = cf_max_diff, y = regret, color = comparison_type, fill = comparison_type)) +
+  geom_jitter(width = 0.15, height = 0, alpha = 0.45, size = 1.8) +
+  stat_summary(
+    aes(group = comparison_type),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange", linewidth = 1.1, size = 1, shape = 21,
+    color = "black"
+  ) +
+  facet_wrap(~ biome, labeller = as_labeller(biome_labels)) +
+  scale_x_continuous(breaks = -4:4) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(
+    values = c("Chosen > revealed CFs" = "#3aa05a",
+               "Chosen < revealed CFs" = "#c0524a"),
+    name = "Counterfactual direction"
+  ) +
+  scale_color_manual(
+    values = c("Chosen > revealed CFs" = "#1f6b3a",
+               "Chosen < revealed CFs" = "#7a2620"),
+    name = "Counterfactual direction"
+  ) +
+  labs(
+    x = "Focal CF − chosen payout (cf_max_diff)",
+    y = "Regret rating (0–100)",
+    title    = "Counterfactual feedback drives regret on full-feedback trials",
+    subtitle = "Positive cf_max_diff = revealed alternative was better · only full-feedback consider trials"
+  ) +
+  base_theme
+
+
+# Print individually, or stitch with patchwork:
+# library(patchwork)
+# (p_salience / p_best_alt_kind) | (p_gap / p_adjacent) | (p_heatmap / p_cf)
+p_salience
+p_best_alt_kind
+p_gap
+p_adjacent
+p_heatmap
+p_cf
+```
+
+```{r}
+p_salience <- d |>
+  group_by(prolific_pid) |>
+  mutate(regret_pmc = regret - mean(regret, na.rm = TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = salience_count, y = regret_pmc, fill = feedback, color = feedback)) +
+  # ggdist::stat_halfeye(
+  #   aes(group = interaction(salience_count, feedback)),
+  #   adjust = 0.5, justification = 0, scale = 0.4,
+  #   .width = 0, point_colour = NA, alpha = .5,
+  #   slab_linewidth = 0.5,
+  #   position = position_dodge(width = .7)
+  # ) +
+  # ggdist::stat_dots(
+  #   aes(group = interaction(salience_count, feedback)),
+  #   side = "right", justification = 0,
+  #   binwidth = 0.25, linewidth = 0.5, alpha = 1,
+  #   position = position_dodge(width = .7)
+  # ) +
+  stat_summary(
+    aes(group = feedback),
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange",
+    linewidth = 1, size = 1, shape = 21,
+    position = position_dodge(width = .7)
+  ) +
+  facet_wrap(~ biome) +
+ # scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(values = feedback_fill,    name = "Feedback",
+                    labels = c("Partial","Full")) +
+  scale_color_manual(values = feedback_colour, name = "Feedback",
+                     labels = c("Partial","Full")) +
+  labs(
+    x = "Number of shortlisted blocks",
+    y = "Regret rating (0–100)",
+    title    = "Does shortlisting more blocks change regret?",
+    subtitle = "Dots = trials · pointranges = mean ± 95% bootstrap CI"
+  ) +
+  base_theme
+p_salience
+```
+
+
+```{r}
+library(ggplot2)
+library(ggdist)
+library(dplyr)
+
+biome_labels <- c(overworld = "Overworld", cave = "Cave", deep = "Deep Cave")
+
+data |>
+  filter(feedback == "partial") |>
+  mutate(biome = factor(biome, levels = c("overworld","cave","deep"))) |>
+  filter(!is.na(regret)) |>
+  ggplot(aes(x = biome, y = regret, fill = biome, color = biome)) +
+  ggdist::stat_halfeye(
+    adjust = 0.5, justification = -0.05, scale = 0.55,
+    .width = 0, point_colour = NA, alpha = 0.55,
+    slab_linewidth = 0.5
+  ) +
+  ggdist::stat_dots(
+    side = "left", justification = 1.1,
+    binwidth = 0.6, alpha = 0.9
+  ) +
+  stat_summary(
+    fun.data = mean_cl_boot, conf.int = .95, B = 5000,
+    geom = "pointrange",
+    linewidth = 1.1, size = 1, shape = 21, color = "black"
+  ) +
+  scale_x_discrete(labels = biome_labels) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  scale_fill_manual(values = c(overworld = "#9ec97d",
+                               cave      = "#7e8a99",
+                               deep      = "#3a4256"),
+                    guide = "none") +
+  scale_color_manual(values = c(overworld = "#5a7a3f",
+                                cave      = "#3f4856",
+                                deep      = "#1c2030"),
+                     guide = "none") +
+  labs(
+    x = NULL,
+    y = "Regret rating (0–100)",
+    title    = "Regret by biome",
+    subtitle = "Dots = trials · pointrange = mean ± 95% bootstrap CI"
+  ) +
+  facet_wrap(~ outcome_kind) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.ticks.x       = element_blank(),
+    panel.grid.major.y = element_line(colour = "grey92", linewidth = 0.4),
+    plot.title         = element_text(face = "bold"),
+    plot.subtitle      = element_text(colour = "grey40", size = 10,
+                                      margin = margin(b = 10))
+  )
+```
+
+```{r}
+data |>
+  group_by(trial_index) |>
+  mutate(avg_reward = mean(outcome_value, na.rm = TRUE)) |>
+  ungroup() |>
+  ggplot(aes(x = trial_index, y = avg_reward)) +
+  geom_smooth(method = "lm") +
+  stat_cor(method = "pearson") +
+  facet_wrap(~ biome)
+  
 ```
